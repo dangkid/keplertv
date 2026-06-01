@@ -1,0 +1,4316 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeplerTV — Tu Cine en Casa</title>
+    <meta name="description" content="KeplerTV: Plataforma de streaming con películas, series y TV en vivo en español.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #08080d;
+            --sidebar: #0c0c14;
+            --surface: #13131e;
+            --card: #191926;
+            --card-hover: #1f1f30;
+            --accent: #7b5bf5;
+            --accent-dim: rgba(123, 91, 245, 0.12);
+            --accent-glow: rgba(123, 91, 245, 0.35);
+            --pink: #e84393;
+            --green: #00cec9;
+            --gold: #fdcb6e;
+            --red: #d63031;
+            --text: #ececf6;
+            --text-dim: #78788e;
+            --border: rgba(255, 255, 255, 0.05);
+            --radius: 12px;
+            --sidebar-w: 230px;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: grid;
+            grid-template-columns: var(--sidebar-w) 1fr
+        }
+
+        @media(max-width:768px) {
+            body {
+                grid-template-columns: 64px 1fr
+            }
+
+            :root {
+                --sidebar-w: 64px
+            }
+
+            .sidebar .menu-label,
+            .sidebar .logo-name,
+            .sidebar .status-label {
+                display: none
+            }
+
+            .sidebar {
+                padding: 20px 8px;
+                align-items: center
+            }
+
+            .sidebar .nav-link {
+                justify-content: center;
+                padding: 12px
+            }
+
+            .sidebar .logo-wrap {
+                justify-content: center
+            }
+        }
+
+        /* === SIDEBAR === */
+        .sidebar {
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 16px;
+            gap: 8px;
+            z-index: 20;
+            position: relative
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            margin-bottom: 20px;
+            cursor: pointer
+        }
+
+        .logo-wrap:hover .logo-img {
+            transform: scale(1.1) rotate(5deg)
+        }
+
+        .logo-img {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 14px var(--accent-glow);
+            transition: transform .3s;
+            object-fit: cover
+        }
+
+        .logo-name {
+            font-size: 20px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #fff 20%, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        .sidebar nav {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 11px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dim);
+            transition: all .2s;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%
+        }
+
+        .nav-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.03);
+            transform: translateX(2px)
+        }
+
+        .nav-link.active {
+            color: #fff;
+            background: var(--accent-dim);
+            border-left: 3px solid var(--accent)
+        }
+
+        .nav-icon {
+            font-size: 18px;
+            width: 22px;
+            text-align: center
+        }
+
+        .sidebar-bottom {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border)
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            font-size: 11px;
+            color: var(--text-dim);
+            font-weight: 600
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--red);
+            box-shadow: 0 0 6px var(--red)
+        }
+
+        .status-dot.on {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green)
+        }
+
+        /* === MAIN === */
+        .main {
+            overflow-y: auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 18px 32px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(8, 8, 13, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border)
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            max-width: 480px
+        }
+
+        .search-box input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 10px 18px 10px 42px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            outline: none;
+            transition: all .25s
+        }
+
+        .search-box input:focus {
+            border-color: rgba(123, 91, 245, 0.3);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 12px rgba(123, 91, 245, 0.06)
+        }
+
+        .search-box .s-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 15px;
+            color: var(--text-dim);
+            pointer-events: none
+        }
+
+        .content-area {
+            flex: 1;
+            padding: 24px 32px 60px
+        }
+
+        @media(max-width:768px) {
+            .content-area {
+                padding: 16px 14px 60px
+            }
+
+            .topbar {
+                padding: 14px 14px
+            }
+        }
+
+        /* === VIEWS === */
+        .view {
+            display: none;
+            animation: fadeUp .35s ease
+        }
+
+        .view.active {
+            display: block
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        /* === HERO === */
+        .hero {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            height: 360px;
+            margin-bottom: 28px;
+            cursor: pointer
+        }
+
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transition: transform 6s
+        }
+
+        .hero:hover .hero-bg {
+            transform: scale(1.03)
+        }
+
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(8, 8, 13, 0.1) 0%, rgba(8, 8, 13, 0.95) 100%)
+        }
+
+        .hero-content {
+            position: absolute;
+            bottom: 32px;
+            left: 32px;
+            right: 32px;
+            z-index: 2
+        }
+
+        .hero-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            margin-bottom: 10px
+        }
+
+        .hero-title {
+            font-size: 36px;
+            font-weight: 900;
+            letter-spacing: -.5px;
+            line-height: 1.15;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, .5)
+        }
+
+        .hero-desc {
+            color: #c8c8d8;
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 550px;
+            margin-bottom: 18px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden
+        }
+
+        .hero-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 24px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px var(--accent-glow);
+            transition: all .25s
+        }
+
+        .hero-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px var(--accent-glow);
+            background: #8d6bf7
+        }
+
+        /* === PROVIDERS === */
+        .providers {
+            display: flex;
+            gap: 10px;
+            padding: 8px 0 20px;
+            overflow-x: auto;
+            scrollbar-width: none
+        }
+
+        .providers::-webkit-scrollbar {
+            display: none
+        }
+
+        .prov-pill {
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-dim);
+            transition: all .2s;
+            flex-shrink: 0
+        }
+
+        .prov-pill:hover {
+            color: #fff;
+            background: var(--card)
+        }
+
+        .prov-pill.active {
+            color: #fff;
+            border-color: var(--accent);
+            background: var(--accent-dim);
+            box-shadow: 0 0 10px var(--accent-glow)
+        }
+
+        /* === SHELF === */
+        .shelf {
+            margin-bottom: 30px
+        }
+
+        .shelf-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px
+        }
+
+        .shelf-title {
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -.2px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .shelf-row {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 4px 0;
+            -webkit-overflow-scrolling: touch
+        }
+
+        .shelf-row::-webkit-scrollbar {
+            display: none
+        }
+
+        /* === POSTER CARD === */
+        .p-card {
+            flex: 0 0 150px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            cursor: pointer;
+            background: var(--card);
+            transition: all .25s cubic-bezier(.16, 1, .3, 1);
+            position: relative;
+            border: 1px solid transparent
+        }
+
+        .p-card:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 14px 28px rgba(0, 0, 0, .45);
+            border-color: rgba(123, 91, 245, .2)
+        }
+
+        .p-card .thumb {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            display: block;
+            background: var(--surface)
+        }
+
+        .p-card .p-info {
+            padding: 10px 10px 12px
+        }
+
+        .p-card .p-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .p-card .p-meta {
+            font-size: 10.5px;
+            color: var(--text-dim);
+            margin-top: 3px;
+            display: flex;
+            align-items: center;
+            gap: 5px
+        }
+
+        .p-card .p-rating {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(8, 8, 13, .85);
+            backdrop-filter: blur(6px);
+            padding: 3px 7px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--gold)
+        }
+
+        /* === TV LAYOUT (MAGISTV FOLDER STYLE) === */
+        .tv-layout {
+            display: flex;
+            gap: 0;
+            height: 100%;
+            min-height: 0;
+            position: relative
+        }
+
+        .tv-sidebar {
+            width: 220px;
+            flex-shrink: 0;
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            border-radius: var(--radius) 0 0 var(--radius);
+            overflow-y: auto;
+            padding: 12px 0
+        }
+
+        .tv-sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 8px
+        }
+
+        .tv-sidebar-icon {
+            font-size: 20px
+        }
+
+        .tv-sidebar-title {
+            font-size: 15px;
+            font-weight: 800
+        }
+
+        .tv-sidebar-cats {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 0 8px
+        }
+
+        .tv-folder {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all .15s;
+            color: var(--text-dim);
+            font-size: 13px;
+            font-weight: 600;
+            position: relative
+        }
+
+        .tv-folder:hover {
+            background: rgba(255, 255, 255, .03);
+            color: var(--text)
+        }
+
+        .tv-folder.active {
+            background: var(--accent-dim);
+            color: #fff
+        }
+
+        .tv-folder.active::before {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 0 3px 3px 0
+        }
+
+        .tv-folder-icon {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0
+        }
+
+        .tv-folder-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .tv-folder-count {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-dim);
+            background: rgba(120, 120, 142, .1);
+            padding: 1px 7px;
+            border-radius: 8px;
+            flex-shrink: 0
+        }
+
+        .tv-folder.active .tv-folder-count {
+            background: rgba(123, 91, 245, .2);
+            color: var(--accent)
+        }
+
+        .tv-content {
+            flex: 1;
+            padding: 16px 20px;
+            overflow-y: auto;
+            min-width: 0
+        }
+
+        .tv-content-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border)
+        }
+
+        .tv-content-title {
+            font-size: 18px;
+            font-weight: 800
+        }
+
+        .tv-content-count {
+            font-size: 12px;
+            color: var(--text-dim);
+            font-weight: 600
+        }
+
+        .tv-subcats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px
+        }
+
+        .tv-subcat {
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            transition: all .2s
+        }
+
+        .tv-subcat:hover {
+            color: #fff;
+            border-color: rgba(123, 91, 245, .2)
+        }
+
+        .tv-subcat.active {
+            color: #fff;
+            border-color: var(--accent);
+            background: var(--accent-dim)
+        }
+
+        /* === CHANNEL CARD === */
+        .ch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px
+        }
+
+        .ch-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: all .2s
+        }
+
+        .ch-card:hover {
+            border-color: rgba(123, 91, 245, .25);
+            background: var(--accent-dim);
+            transform: translateY(-2px)
+        }
+
+        .ch-card .ch-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            object-fit: contain;
+            background: #fff;
+            padding: 4px;
+            flex-shrink: 0
+        }
+
+        .ch-card .ch-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .ch-card .ch-name {
+            font-size: 13.5px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .ch-card .ch-meta {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 2px;
+            display: flex;
+            gap: 6px;
+            align-items: center
+        }
+
+        .ch-card .ch-live {
+            font-size: 9px;
+            font-weight: 800;
+            color: var(--green);
+            background: rgba(0, 206, 201, .1);
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: .3px;
+            flex-shrink: 0
+        }
+
+        /* === GENRE PILLS === */
+        .genre-bar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 0 20px;
+            overflow-x: auto;
+            scrollbar-width: none
+        }
+
+        .genre-bar::-webkit-scrollbar {
+            display: none
+        }
+
+        .g-pill {
+            padding: 7px 16px;
+            border-radius: 18px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            transition: all .2s;
+            flex-shrink: 0
+        }
+
+        .g-pill:hover {
+            color: #fff
+        }
+
+        .g-pill.active {
+            color: #fff;
+            border-color: var(--accent);
+            background: var(--accent-dim)
+        }
+
+        /* === CONTENT GRID === */
+        .c-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 16px
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+            font-size: 14px
+        }
+
+        /* === DETAIL VIEW === */
+        .detail-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px
+        }
+
+        .btn-back {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 9px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all .2s
+        }
+
+        .btn-back:hover {
+            background: var(--card);
+            transform: translateX(-3px)
+        }
+
+        .detail-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 32px
+        }
+
+        @media(max-width:850px) {
+            .detail-layout {
+                grid-template-columns: 1fr
+            }
+        }
+
+        .detail-poster {
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 16px 32px rgba(0, 0, 0, .6)
+        }
+
+        .detail-poster img {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            display: block
+        }
+
+        .detail-right {
+            display: flex;
+            flex-direction: column;
+            gap: 20px
+        }
+
+        .detail-cat-badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 6px;
+            letter-spacing: .5px;
+            text-transform: uppercase
+        }
+
+        .detail-title {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -.5px;
+            margin-top: 6px
+        }
+
+        .detail-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .d-tag {
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-dim)
+        }
+
+        .d-tag.gold {
+            color: var(--gold)
+        }
+
+        .detail-overview {
+            font-size: 14px;
+            color: #b8b8cc;
+            line-height: 1.7
+        }
+
+        /* === PLAYER === */
+        .player-wrap {
+            background: #000;
+            border-radius: 14px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            position: relative;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, .6)
+        }
+
+        .player-wrap video,
+        .player-wrap iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+            position: absolute;
+            inset: 0
+        }
+
+        .player-loader {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, .85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            z-index: 5
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, .1);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin .8s linear infinite
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        /* === SERVER LIST === */
+        .servers-section {
+            margin-top: 4px
+        }
+
+        .servers-label {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 10px
+        }
+
+        .srv-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .srv-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 13px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            transition: all .2s;
+            width: 100%
+        }
+
+        .srv-btn:hover {
+            border-color: rgba(123, 91, 245, .2);
+            transform: translateY(-1px)
+        }
+
+        .srv-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+            box-shadow: 0 0 12px rgba(123, 91, 245, .08)
+        }
+
+        .srv-icon {
+            font-size: 20px;
+            flex-shrink: 0
+        }
+
+        .srv-info {
+            flex: 1
+        }
+
+        .srv-name {
+            font-size: 13px;
+            font-weight: 700
+        }
+
+        .srv-sub {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 1px
+        }
+
+        .srv-badge {
+            font-size: 9px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 5px;
+            background: rgba(0, 206, 201, .12);
+            color: var(--green);
+            border: 1px solid rgba(0, 206, 201, .25);
+            flex-shrink: 0
+        }
+
+        /* === FASE 3: SEASON / EPISODE BUTTONS === */
+        .season-list,
+        .episode-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 2px 0
+        }
+
+        .ep-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all .2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dim);
+            min-width: 0;
+            flex: 0 0 auto
+        }
+
+        .ep-btn:hover {
+            border-color: rgba(123, 91, 245, .2);
+            color: var(--text)
+        }
+
+        .ep-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+            color: #fff
+        }
+
+        .ep-count {
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-dim);
+            background: rgba(120, 120, 142, .1);
+            padding: 1px 6px;
+            border-radius: 4px
+        }
+
+        .ep-num {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(120, 120, 142, .1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 800;
+            flex-shrink: 0
+        }
+
+        .ep-btn.active .ep-num {
+            background: var(--accent);
+            color: #fff
+        }
+
+        .ep-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .ep-name {
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis
+        }
+
+        .ep-overview {
+            font-size: 9px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 1px
+        }
+
+        .ep-still {
+            width: 50px;
+            height: 28px;
+            border-radius: 4px;
+            object-fit: cover;
+            flex-shrink: 0
+        }
+
+        .srv-group-label {
+            padding: 4px 0 8px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--text-dim)
+        }
+
+        /* === SCROLLBAR MAIN === */
+        .main::-webkit-scrollbar {
+            width: 5px
+        }
+
+        .main::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        .main::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, .08);
+            border-radius: 4px
+        }
+
+        .main::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, .15)
+        }
+
+        /* === LOADING === */
+        .loading-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            gap: 14px
+        }
+
+        .loading-box .spinner {
+            width: 36px;
+            height: 36px
+        }
+
+        .loading-text {
+            font-size: 13px;
+            color: var(--text-dim);
+            font-weight: 600
+        }
+
+        /* === SPORTS SECTION === */
+        .sports-section {
+            padding: 20px 0 10px
+        }
+
+        .sports-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 24px 14px
+        }
+
+        .sports-icon {
+            font-size: 22px
+        }
+
+        .sports-title {
+            font-size: 18px;
+            font-weight: 800;
+            flex: 1
+        }
+
+        .sports-badge {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--green);
+            background: rgba(0, 206, 201, .12);
+            padding: 4px 12px;
+            border-radius: 20px;
+            white-space: nowrap
+        }
+
+        .sports-row {
+            display: flex;
+            gap: 12px;
+            padding: 0 24px 4px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch
+        }
+
+        .sports-row::-webkit-scrollbar {
+            height: 4px
+        }
+
+        .sports-row::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, .08);
+            border-radius: 4px
+        }
+
+        .sports-card {
+            flex: 0 0 220px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            cursor: pointer;
+            transition: all .2s;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        .sports-card:hover {
+            background: var(--card-hover);
+            border-color: rgba(123, 91, 245, .2);
+            transform: translateY(-2px)
+        }
+
+        .sports-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px
+        }
+
+        .sports-league {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .sports-minute {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--green);
+            background: rgba(0, 206, 201, .12);
+            padding: 2px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+            animation: pulse-minute 2s ease-in-out infinite
+        }
+
+        @keyframes pulse-minute {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .5
+            }
+        }
+
+        .sports-card-teams {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px
+        }
+
+        .sports-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 0
+        }
+
+        .sports-crest {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .04)
+        }
+
+        .sports-team-name {
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 70px
+        }
+
+        .sports-score {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--text);
+            min-width: 48px;
+            text-align: center;
+            font-variant-numeric: tabular-nums
+        }
+
+        .sports-card-bottom {
+            display: flex;
+            justify-content: center
+        }
+
+        .sports-watch-btn {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+            background: var(--accent-dim);
+            padding: 6px 16px;
+            border-radius: 20px;
+            transition: all .2s
+        }
+
+        .sports-card:hover .sports-watch-btn {
+            background: rgba(123, 91, 245, .25)
+        }
+
+        /* === SPORTS MODAL === */
+        .sports-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px
+        }
+
+        .sports-modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, .7);
+            backdrop-filter: blur(4px)
+        }
+
+        .sports-modal {
+            position: relative;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            max-width: 480px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 28px 24px 20px;
+            animation: modalIn .25s ease-out
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(.95) translateY(10px)
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0)
+            }
+        }
+
+        .sports-modal::-webkit-scrollbar {
+            width: 4px
+        }
+
+        .sports-modal::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, .08);
+            border-radius: 4px
+        }
+
+        .sports-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(255, 255, 255, .06);
+            border: none;
+            color: var(--text-dim);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s
+        }
+
+        .sports-modal-close:hover {
+            background: rgba(255, 255, 255, .12);
+            color: var(--text)
+        }
+
+        .sports-modal-header {
+            margin-bottom: 20px
+        }
+
+        .sports-modal-teams {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px
+        }
+
+        .sports-modal-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1
+        }
+
+        .sports-modal-crest {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .04)
+        }
+
+        .sports-modal-team-name {
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center
+        }
+
+        .sports-modal-score-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px
+        }
+
+        .sports-modal-score {
+            font-size: 32px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums
+        }
+
+        .sports-modal-minute {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--green);
+            background: rgba(0, 206, 201, .12);
+            padding: 2px 10px;
+            border-radius: 10px
+        }
+
+        .sports-modal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center
+        }
+
+        .sports-modal-meta span {
+            font-size: 12px;
+            color: var(--text-dim);
+            font-weight: 500
+        }
+
+        .sports-modal-body {
+            border-top: 1px solid var(--border);
+            padding-top: 16px
+        }
+
+        .sports-modal-subtitle {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 12px
+        }
+
+        .sports-ch-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .sports-ch-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: all .2s
+        }
+
+        .sports-ch-btn:hover {
+            background: var(--card-hover);
+            border-color: rgba(123, 91, 245, .2)
+        }
+
+        .sports-ch-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, .04)
+        }
+
+        .sports-ch-name {
+            flex: 1;
+            font-size: 13px;
+            font-weight: 600
+        }
+
+        .sports-ch-live {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--red);
+            background: rgba(214, 48, 49, .12);
+            padding: 3px 8px;
+            border-radius: 10px;
+            animation: pulse-minute 1.5s ease-in-out infinite
+        }
+
+        .sports-no-channels {
+            font-size: 13px;
+            color: var(--text-dim);
+            text-align: center;
+            padding: 20px 0
+        }
+
+        /* === SPORTS PAGE (Vista dedicada) === */
+        .sports-page {
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto
+        }
+
+        .sports-page-header {
+            margin-bottom: 28px
+        }
+
+        .sports-page-title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px
+        }
+
+        .sports-page-icon {
+            font-size: 28px
+        }
+
+        .sports-page-title {
+            font-size: 24px;
+            font-weight: 800;
+            flex: 1;
+            margin: 0
+        }
+
+        .sports-page-clock {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--green);
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 206, 201, .08);
+            padding: 6px 16px;
+            border-radius: 10px;
+            letter-spacing: 1px
+        }
+
+        .sports-page-subtitle {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin: 0 0 0 40px
+        }
+
+        .sports-page-content {
+            display: flex;
+            flex-direction: column;
+            gap: 24px
+        }
+
+        .sports-loading {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+            font-size: 15px
+        }
+
+        .sports-loading::after {
+            content: '';
+            display: block;
+            width: 32px;
+            height: 32px;
+            margin: 16px auto;
+            border: 3px solid rgba(255,255,255,.06);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg) }
+        }
+
+        /* Sports Channel Card (nueva versión) */
+        .sports-channel-card {
+            background: var(--card);
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s;
+            border: 1px solid var(--border);
+            position: relative
+        }
+
+        .sports-channel-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,.4);
+            border-color: rgba(123, 91, 245, .2)
+        }
+
+        .sports-channel-banner {
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden
+        }
+
+        .sports-channel-banner img {
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,.5));
+            z-index: 1
+        }
+
+        .sports-channel-banner .live-tag {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #fff;
+            background: var(--red);
+            padding: 3px 10px;
+            border-radius: 8px;
+            animation: pulse-minute 1.5s ease-in-out infinite;
+            z-index: 2
+        }
+
+        .sports-channel-banner .country-tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            color: rgba(255,255,255,.8);
+            background: rgba(0,0,0,.4);
+            padding: 3px 10px;
+            border-radius: 8px;
+            z-index: 2;
+            backdrop-filter: blur(4px)
+        }
+
+        .sports-channel-info {
+            padding: 16px
+        }
+
+        .sports-channel-info h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 6px
+        }
+
+        .sports-channel-info p {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin: 0 0 14px;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden
+        }
+
+        .sports-channel-info .watch-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            background: var(--primary);
+            padding: 8px 18px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: background .2s, transform .1s
+        }
+
+        .sports-channel-info .watch-btn:hover {
+            background: var(--primary-hover);
+            transform: scale(1.02)
+        }
+
+        .sports-channel-info .watch-btn:active {
+            transform: scale(.97)
+        }
+
+        /* Sports Player Page */
+        .sports-player-wrap {
+            padding: 24px;
+            max-width: 1000px;
+            margin: 0 auto
+        }
+
+        .sports-player-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px
+        }
+
+        .sports-player-header img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            border-radius: 10px;
+            background: rgba(255,255,255,.04)
+        }
+
+        .sports-player-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0;
+            flex: 1
+        }
+
+        .sports-player-header .live-indicator {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--red);
+            background: rgba(214, 48, 49, .12);
+            padding: 4px 14px;
+            border-radius: 10px;
+            animation: pulse-minute 1.5s ease-in-out infinite
+        }
+
+        .sports-player-container {
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .sports-player-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain
+        }
+
+        .sports-player-container .player-placeholder {
+            text-align: center;
+            color: var(--text-dim)
+        }
+
+        .sports-player-container .player-placeholder .big-icon {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 12px
+        }
+
+        .sports-player-container .player-placeholder p {
+            font-size: 14px;
+            margin: 0
+        }
+
+        .sports-player-container .player-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,.7);
+            z-index: 5
+        }
+
+        .sports-player-container .player-loader .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,.06);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 12px
+        }
+
+        .sports-player-container .player-loader span {
+            font-size: 13px;
+            color: var(--text-dim)
+        }
+
+        /* === SPORTS PAGE SECTION STYLES === */
+        .sports-page-section {
+            margin-bottom: 32px
+        }
+
+        .sports-page-section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 16px
+        }
+
+        .sports-page-section-count {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            background: var(--surface);
+            padding: 2px 10px;
+            border-radius: 20px
+        }
+
+        .sports-page-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px
+        }
+
+        /* Match Card */
+        .sports-match-card {
+            background: var(--card);
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform .2s, box-shadow .2s;
+            border: 1px solid var(--border);
+            position: relative
+        }
+
+        .sports-match-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,.4);
+            border-color: rgba(123, 91, 245, .2)
+        }
+
+        .sports-match-card-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px 8px
+        }
+
+        .sports-match-league-logo {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+            border-radius: 4px
+        }
+
+        .sports-match-league {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            flex: 1
+        }
+
+        .sports-match-live-tag {
+            font-size: 9px;
+            font-weight: 800;
+            color: #fff;
+            background: #e74c3c;
+            padding: 2px 8px;
+            border-radius: 4px;
+            animation: pulse 1.5s infinite
+        }
+
+        .sports-match-time {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--gold)
+        }
+
+        .sports-match-card-teams {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            gap: 12px
+        }
+
+        .sports-match-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 0
+        }
+
+        .sports-match-crest {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: var(--surface);
+            padding: 4px
+        }
+
+        .sports-match-team-name {
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.3;
+            color: var(--text)
+        }
+
+        .sports-match-score {
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--gold);
+            white-space: nowrap;
+            min-width: 50px;
+            text-align: center
+        }
+
+        .sports-match-card-channels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 4px 16px 8px
+        }
+
+        .sports-match-channel-tag {
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text-dim);
+            background: var(--surface);
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap
+        }
+
+        .sports-match-card-bottom {
+            padding: 8px 16px 12px;
+            display: flex
+        }
+
+        .sports-match-watch-btn {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+            background: rgba(123, 91, 245, .12);
+            padding: 6px 16px;
+            border-radius: 8px;
+            transition: background .2s;
+            width: 100%;
+            text-align: center
+        }
+
+        .sports-match-card:hover .sports-match-watch-btn {
+            background: rgba(123, 91, 245, .25)
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1 }
+            50% { opacity: .5 }
+        }
+
+        /* === ANIME SECTION === */
+        .anime-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap
+        }
+
+        .anime-header-title {
+            font-size: 22px;
+            font-weight: 800;
+            white-space: nowrap
+        }
+
+        .anime-search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 4px 4px 4px 14px;
+            flex: 1;
+            max-width: 420px;
+            transition: border-color .2s
+        }
+
+        .anime-search-box:focus-within {
+            border-color: var(--accent)
+        }
+
+        .anime-search-icon {
+            font-size: 16px;
+            opacity: .5
+        }
+
+        .anime-search-input {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            padding: 8px 0
+        }
+
+        .anime-search-input::placeholder {
+            color: var(--text-dim)
+        }
+
+        .anime-search-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .2s;
+            font-family: inherit
+        }
+
+        .anime-search-btn:hover {
+            opacity: .85
+        }
+
+        .anime-welcome {
+            text-align: center;
+            padding: 60px 20px
+        }
+
+        .anime-welcome-icon {
+            font-size: 64px;
+            margin-bottom: 16px
+        }
+
+        .anime-welcome-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 8px
+        }
+
+        .anime-welcome-text {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-bottom: 24px
+        }
+
+        .anime-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            max-width: 500px;
+            margin: 0 auto
+        }
+
+        .anime-suggestion {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            color: var(--text)
+        }
+
+        .anime-suggestion:hover {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        /* Anime grid */
+        .anime-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+            padding: 8px 0
+        }
+
+        .anime-card {
+            background: var(--card);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all .25s;
+            border: 1px solid var(--border)
+        }
+
+        .anime-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+            box-shadow: 0 8px 24px rgba(123, 91, 245, .15)
+        }
+
+        .anime-card-img {
+            width: 100%;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+            display: block;
+            background: var(--surface)
+        }
+
+        .anime-card-body {
+            padding: 10px 12px 12px
+        }
+
+        .anime-card-title {
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden
+        }
+
+        .anime-card-type {
+            font-size: 10px;
+            color: var(--accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 4px
+        }
+
+        /* Anime detail */
+        .anime-detail-layout {
+            display: flex;
+            gap: 28px;
+            padding: 20px 0
+        }
+
+        .anime-detail-poster {
+            flex: 0 0 260px
+        }
+
+        .anime-detail-poster img {
+            width: 100%;
+            border-radius: 14px;
+            background: var(--surface)
+        }
+
+        .anime-detail-info {
+            flex: 1;
+            min-width: 0
+        }
+
+        .anime-detail-title {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            line-height: 1.2
+        }
+
+        .anime-detail-desc {
+            font-size: 14px;
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin-bottom: 20px
+        }
+
+        .anime-detail-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px
+        }
+
+        .anime-detail-meta span {
+            font-size: 12px;
+            background: var(--surface);
+            padding: 4px 12px;
+            border-radius: 8px;
+            color: var(--text-dim)
+        }
+
+        .anime-episodes-label {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text)
+        }
+
+        .anime-episodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px
+        }
+
+        .anime-episodes-grid::-webkit-scrollbar {
+            width: 4px
+        }
+
+        .anime-episodes-grid::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, .08);
+            border-radius: 4px
+        }
+
+        .anime-ep-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            color: var(--text)
+        }
+
+        .anime-ep-btn:hover {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+            color: var(--accent)
+        }
+
+        .anime-ep-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff
+        }
+
+        /* Anime player */
+        .anime-player-wrap {
+            margin-top: 20px;
+            background: var(--surface);
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border)
+        }
+
+        .anime-player-wrap iframe {
+            width: 100%;
+            height: 400px;
+            border: none;
+            display: block
+        }
+
+        .anime-player-loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            gap: 12px
+        }
+
+        .anime-player-loader .spinner {
+            width: 32px;
+            height: 32px
+        }
+
+        .anime-server-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px
+        }
+
+        .anime-server-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            color: var(--text);
+            font-family: inherit
+        }
+
+        .anime-server-btn:hover {
+            background: var(--accent-dim);
+            border-color: var(--accent)
+        }
+
+        .anime-server-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff
+        }
+
+        .anime-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            gap: 12px
+        }
+
+        .anime-loading-text {
+            font-size: 14px;
+            color: var(--text-dim)
+        }
+
+        .anime-no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-dim);
+            font-size: 14px
+        }
+
+        @media (max-width: 768px) {
+            .anime-header {
+                flex-direction: column;
+                align-items: stretch
+            }
+
+            .anime-search-box {
+                max-width: 100%
+            }
+
+            .anime-detail-layout {
+                flex-direction: column
+            }
+
+            .anime-detail-poster {
+                flex: 0 0 auto;
+                max-width: 200px;
+                margin: 0 auto
+            }
+
+            .anime-player-wrap iframe {
+                height: 250px
+            }
+
+            .anime-grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr))
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="logo-wrap" onclick="switchView('home')">
+            <img src="/bulldog_logo.png" class="logo-img" alt="KeplerTV" onerror="this.style.display='none'">
+            <span class="logo-name">KeplerTV</span>
+        </div>
+        <nav>
+            <button class="nav-link active" id="nav-home" onclick="switchView('home')">
+                <span class="nav-icon">🏠</span><span class="menu-label">Inicio</span>
+            </button>
+            <button class="nav-link" id="nav-movies" onclick="switchView('movies')">
+                <span class="nav-icon">🎬</span><span class="menu-label">Películas</span>
+            </button>
+            <button class="nav-link" id="nav-series" onclick="switchView('series')">
+                <span class="nav-icon">📺</span><span class="menu-label">Series</span>
+            </button>
+            <button class="nav-link" id="nav-sports" onclick="switchView('sports')">
+                <span class="nav-icon">⚽</span><span class="menu-label">Deportes</span>
+            </button>
+            <button class="nav-link" id="nav-tv" onclick="switchView('tv')">
+                <span class="nav-icon">📡</span><span class="menu-label">TV en Vivo</span>
+            </button>
+            <button class="nav-link" id="nav-anime" onclick="switchView('anime')">
+                <span class="nav-icon">🎌</span><span class="menu-label">Anime</span>
+            </button>
+        </nav>
+        <div class="sidebar-bottom">
+            <div class="status-row">
+                <span class="status-dot" id="s-dot"></span>
+                <span class="status-label" id="s-text">Conectando...</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <header class="topbar">
+            <div class="search-box">
+                <span class="s-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="Buscar películas, series o canales..."
+                    oninput="handleSearch()">
+            </div>
+        </header>
+
+        <div class="content-area">
+            <!-- HOME -->
+            <div class="view active" id="view-home">
+                <div id="home-content"></div>
+            </div>
+
+            <!-- MOVIES -->
+            <div class="view" id="view-movies">
+                <h2 style="font-size:22px;font-weight:800;margin-bottom:6px">🎬 Películas</h2>
+                <div class="genre-bar" id="movie-genre-bar"></div>
+                <div class="c-grid" id="movie-grid"></div>
+            </div>
+
+            <!-- SERIES -->
+            <div class="view" id="view-series">
+                <h2 style="font-size:22px;font-weight:800;margin-bottom:6px">📺 Series</h2>
+                <div class="genre-bar" id="series-genre-bar"></div>
+                <div class="c-grid" id="series-grid"></div>
+            </div>
+
+            <!-- TV (MagisTV-style folder view) -->
+            <div class="view" id="view-tv">
+                <div class="tv-layout">
+                    <!-- Sidebar de categorías (carpetas) -->
+                    <div class="tv-sidebar" id="tv-sidebar">
+                        <div class="tv-sidebar-header">
+                            <span class="tv-sidebar-icon">📡</span>
+                            <span class="tv-sidebar-title">TV en Vivo</span>
+                        </div>
+                        <div class="tv-sidebar-cats" id="tv-sidebar-cats"></div>
+                    </div>
+                    <!-- Contenido de la categoría seleccionada -->
+                    <div class="tv-content" id="tv-content">
+                        <div class="tv-content-header" id="tv-content-header">
+                            <h3 class="tv-content-title" id="tv-content-title">📺 Todos los Canales</h3>
+                            <span class="tv-content-count" id="tv-content-count">0 canales</span>
+                        </div>
+                        <!-- Sub-categorías (países) -->
+                        <div class="tv-subcats" id="tv-subcats"></div>
+                        <!-- Grid de canales -->
+                        <div class="ch-grid" id="tv-grid"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DETAIL -->
+            <div class="view" id="view-detail">
+                <div class="detail-head">
+                    <button class="btn-back" onclick="goBack()">← Volver</button>
+                </div>
+                <div class="detail-layout">
+                    <div class="detail-poster"><img id="d-poster" alt="Poster"></div>
+                    <div class="detail-right">
+                        <div>
+                            <span class="detail-cat-badge" id="d-cat">Película</span>
+                            <h1 class="detail-title" id="d-title"></h1>
+                        </div>
+                        <div class="detail-tags" id="d-tags"></div>
+                        <p class="detail-overview" id="d-overview"></p>
+                        <div class="language-alert" id="language-alert"
+                            style="display:none;align-items:flex-start;gap:12px;background:rgba(253,203,110,0.06);border:1px solid rgba(253,203,110,0.15);padding:12px 16px;border-radius:12px;font-size:13px;color:#ffeaa7;line-height:1.5;margin-bottom:10px;">
+                            <span style="font-size:18px;line-height:1;">💡</span>
+                            <div>
+                                <strong style="color:var(--gold);display:block;margin-bottom:2px;">¿El reproductor está
+                                    en inglés?</strong>
+                                Haz clic en el icono de <strong>engranaje (Ajustes)</strong> o de <strong>audio</strong>
+                                dentro del reproductor de video y selecciona la pista de audio en <strong>Español o
+                                    Latino</strong>. Si un servidor falla, prueba con otro de la lista de abajo o haz
+                                clic en <em>Abrir en Pestaña Nueva</em>.
+                            </div>
+                        </div>
+                        <div class="player-wrap" id="player-wrap" style="display:none">
+                            <div class="player-loader" id="player-loader" style="display:none">
+                                <div class="spinner"></div>
+                                <span style="font-size:12px;font-weight:600;color:var(--text-dim)">Cargando
+                                    señal...</span>
+                            </div>
+                            <video id="vid-el" controls playsinline style="display:none"></video>
+                            <iframe id="ifr-el" style="display:none" allowfullscreen
+                                allow="autoplay; encrypted-media; fullscreen"></iframe>
+                        </div>
+                        <div class="player-actions" id="player-actions"
+                            style="display:none;margin-top:10px;gap:10px;justify-content:flex-end;">
+                            <a id="btn-open-tab" href="#" target="_blank" class="action-btn"
+                                style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--gold);background:rgba(253,203,110,.1);border:1px solid rgba(253,203,110,.25);padding:8px 14px;border-radius:10px;transition:all 0.2s;cursor:pointer;">
+                                <span>↗️</span> Abrir en Pestaña Nueva (Si falla o tiene anuncios)
+                            </a>
+                        </div>
+                        <!-- FASE 3: Selector de Temporadas (Solo Series) -->
+                        <div class="servers-section" id="season-section" style="display:none">
+                            <div class="servers-label">Temporadas</div>
+                            <div class="season-list" id="season-list"></div>
+                        </div>
+                        <!-- FASE 3: Selector de Episodios (Solo Series) -->
+                        <div class="servers-section" id="episode-section" style="display:none">
+                            <div class="servers-label">Episodios</div>
+                            <div class="episode-list" id="episode-list"></div>
+                        </div>
+                        <div class="servers-section">
+                            <div class="servers-label">Servidores de Reproducción</div>
+                            <div class="srv-list" id="srv-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEARCH RESULTS -->
+            <div class="view" id="view-search">
+                <h2 style="font-size:20px;font-weight:800;margin-bottom:16px" id="search-title">Resultados</h2>
+                <div class="c-grid" id="search-grid"></div>
+            </div>
+
+            <!-- ANIME -->
+            <div class="view" id="view-anime">
+                <div class="anime-header">
+                    <h2 class="anime-header-title">🎌 Anime</h2>
+                    <div class="anime-search-box">
+                        <span class="anime-search-icon">🔍</span>
+                        <input type="text" id="anime-search-input" placeholder="Buscar anime..."
+                            class="anime-search-input" onkeydown="if(event.key==='Enter') searchAnime()">
+                        <button class="anime-search-btn" onclick="searchAnime()">Buscar</button>
+                    </div>
+                </div>
+                <div id="anime-content">
+                    <div class="anime-welcome">
+                        <div class="anime-welcome-icon">🎌</div>
+                        <h3 class="anime-welcome-title">Explora el mundo del Anime</h3>
+                        <p class="anime-welcome-text">Busca tus animes favoritos y disfruta de episodios en español.</p>
+                        <div class="anime-suggestions">
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Naruto')">Naruto</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('One Piece')">One Piece</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Dragon Ball')">Dragon Ball</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Attack on Titan')">Attack on
+                                Titan</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Demon Slayer')">Demon
+                                Slayer</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Jujutsu Kaisen')">Jujutsu
+                                Kaisen</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ANIME DETAIL -->
+            <div class="view" id="view-anime-detail">
+                <div class="detail-head">
+                    <button class="btn-back" onclick="goBackAnime()">← Volver</button>
+                </div>
+                <div id="anime-detail-content"></div>
+            </div>
+
+            <!-- SPORTS -->
+            <div class="view" id="view-sports">
+                <div class="sports-page">
+                    <div class="sports-page-header">
+                        <div class="sports-page-title-row">
+                            <span class="sports-page-icon">⚽</span>
+                            <h2 class="sports-page-title">Deportes en Vivo</h2>
+                            <span class="sports-page-clock" id="sports-clock">00:00</span>
+                        </div>
+                        <p class="sports-page-subtitle">Canales deportivos en vivo desde Fútbol Libre</p>
+                    </div>
+                    <div class="sports-page-content" id="sports-page-content">
+                        <div class="sports-loading">Cargando canales deportivos...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SPORTS DETAIL (player) -->
+            <div class="view" id="view-sports-detail">
+                <div class="detail-head">
+                    <button class="btn-back" onclick="goBackSports()">← Volver</button>
+                </div>
+                <div id="sports-detail-content"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API = '/api';
+
+        // ===== STATE =====
+        const S = {
+            view: 'home', prevView: 'home',
+            movies: [], series: [], channels: [],
+            nowPlaying: [], trending: [], topRated: [],
+            trendingSeries: [],
+            hls: null,
+            tvFolder: 'all', tvCountry: 'all',
+            movieGenre: 'all', seriesGenre: 'all',
+            provFilter: null, searchTimeout: null,
+            detailItem: null,
+            // FASE 3: Series seasons/episodes
+            seriesDetail: null,
+            selectedSeason: 1,
+            selectedEpisode: 1,
+            episodes: [],
+            // FASE 4: Dynamic servers
+            streams: [],
+            streamsLoading: false,
+            // SPORTS: Live matches & channels
+            liveMatches: [],
+            sportsChannels: [],
+            sportsInterval: null,
+            sportsClockInterval: null,
+            iframeTimeout: null,
+            sportsHls: null,
+            sportsDetailChannel: null
+        };
+
+        // ===== INIT =====
+        document.addEventListener('DOMContentLoaded', init);
+
+        async function init() {
+            checkStatus();
+            await Promise.all([
+                loadData('/movies/popular', d => S.movies = d),
+                loadData('/movies/now-playing', d => S.nowPlaying = d),
+                loadData('/movies/trending', d => S.trending = d),
+                loadData('/series/popular', d => S.series = d),
+                loadData('/series/trending', d => S.trendingSeries = d),
+                loadData('/tv/live-channels', d => S.channels = d),
+                loadSportsData(),
+                loadSportsChannels(),
+            ]);
+            renderHome();
+            // Auto-refresh sports every 60 seconds
+            startSportsRefresh();
+            // Start sports page clock
+            startSportsClock();
+        }
+
+        async function loadSportsChannels() {
+            try {
+                const r = await fetch(`${API}/sports/channels`);
+                const j = await r.json();
+                S.sportsChannels = j.data || [];
+            } catch (e) {
+                console.warn('Error loading sports channels:', e);
+                S.sportsChannels = [];
+            }
+        }
+
+        // ===== SPORTS: LIVE MATCHES =====
+        async function loadSportsData() {
+            try {
+                const r = await fetch(`${API}/sports/live`);
+                const j = await r.json();
+                S.liveMatches = j.data || [];
+            } catch (e) {
+                console.warn('Error loading sports data:', e);
+                S.liveMatches = [];
+            }
+        }
+
+        function startSportsRefresh() {
+            if (S.sportsInterval) clearInterval(S.sportsInterval);
+            S.sportsInterval = setInterval(async () => {
+                await loadSportsData();
+                // If on home view, re-render the sports section
+                if (S.view === 'home') {
+                    const container = document.getElementById('home-sports-section');
+                    if (container) {
+                        container.innerHTML = renderSportsSection();
+                    }
+                }
+                // If on sports page, re-render
+                if (S.view === 'sports') {
+                    renderSportsPage();
+                }
+            }, 60000); // Cada 60 segundos
+        }
+
+        function startSportsClock() {
+            if (S.sportsClockInterval) clearInterval(S.sportsClockInterval);
+            function updateClock() {
+                const el = document.getElementById('sports-clock');
+                if (!el) return;
+                const now = new Date();
+                const h = String(now.getHours()).padStart(2, '0');
+                const m = String(now.getMinutes()).padStart(2, '0');
+                const s = String(now.getSeconds()).padStart(2, '0');
+                el.textContent = `${h}:${m}:${s}`;
+            }
+            updateClock();
+            S.sportsClockInterval = setInterval(updateClock, 1000);
+        }
+
+        // ===== SPORTS PAGE (Vista dedicada) =====
+        function renderSportsPage() {
+            const container = document.getElementById('sports-page-content');
+            if (!container) return;
+
+            // Build match cards from liveMatches
+            const matches = S.liveMatches || [];
+            const channels = S.sportsChannels || [];
+
+            let html = '';
+
+            // Section: Partidos en Vivo (from jjfutbol2.lat)
+            if (matches.length > 0) {
+                html += `<div class="sports-page-section">
+                    <div class="sports-page-section-title">
+                        <span>⚽ Partidos en Vivo</span>
+                        <span class="sports-page-section-count">${matches.length} partidos</span>
+                    </div>
+                    <div class="sports-page-grid">`;
+                matches.forEach(m => {
+                    const homeBadge = m.homeBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.homeTeam || '?')}&background=1a1a2e&color=fff&size=64`;
+                    const awayBadge = m.awayBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.awayTeam || '?')}&background=16213e&color=fff&size=64`;
+                    const score = (m.homeScore !== null && m.awayScore !== null) ? `${m.homeScore} - ${m.awayScore}` : 'vs';
+                    const minute = m.minute || m.status || '';
+                    const league = m.league || '';
+                    const isLive = m.status === 'live';
+                    const matchData = encodeURIComponent(JSON.stringify(m));
+                    html += `<div class="sports-match-card" onclick='openSportsMatchFromPage(decodeURIComponent("${matchData}"))'>
+                        <div class="sports-match-card-top">
+                            ${m.leagueBadge ? `<img class="sports-match-league-logo" src="${m.leagueBadge}" alt="${league}" loading="lazy">` : ''}
+                            <span class="sports-match-league">${league}</span>
+                            ${isLive ? '<span class="sports-match-live-tag">EN VIVO</span>' : `<span class="sports-match-time">${minute}</span>`}
+                        </div>
+                        <div class="sports-match-card-teams">
+                            <div class="sports-match-team">
+                                <img class="sports-match-crest" src="${homeBadge}" alt="${m.homeTeam}" loading="lazy" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(m.homeTeam || '?')}&background=1a1a2e&color=fff&size=64'">
+                                <span class="sports-match-team-name">${m.homeTeam || 'Local'}</span>
+                            </div>
+                            <div class="sports-match-score">${score}</div>
+                            <div class="sports-match-team">
+                                <img class="sports-match-crest" src="${awayBadge}" alt="${m.awayTeam}" loading="lazy" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(m.awayTeam || '?')}&background=16213e&color=fff&size=64'">
+                                <span class="sports-match-team-name">${m.awayTeam || 'Visitante'}</span>
+                            </div>
+                        </div>
+                        ${m.channels && m.channels.length > 0 ? `
+                        <div class="sports-match-card-channels">
+                            ${m.channels.slice(0, 3).map(c => `<span class="sports-match-channel-tag">${c.name}</span>`).join('')}
+                            ${m.channels.length > 3 ? `<span class="sports-match-channel-tag">+${m.channels.length - 3}</span>` : ''}
+                        </div>` : ''}
+                        <div class="sports-match-card-bottom">
+                            <span class="sports-match-watch-btn">📺 Ver Partido</span>
+                        </div>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            // Section: Canales Deportivos
+            if (channels.length > 0) {
+                html += `<div class="sports-page-section">
+                    <div class="sports-page-section-title">
+                        <span>📡 Canales Deportivos</span>
+                        <span class="sports-page-section-count">${channels.length} canales</span>
+                    </div>
+                    <div class="sports-page-grid">`;
+                channels.forEach(ch => {
+                    const chData = encodeURIComponent(JSON.stringify(ch));
+                    html += `<div class="sports-channel-card" onclick='openSportsChannelDetail(decodeURIComponent("${chData}"))'>
+                        <div class="sports-channel-banner" style="background:${ch.bgColor || '#1a1a2e'}">
+                            <img src="${ch.logo}" alt="${ch.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/72/13131e/78788e?text=TV'">
+                            <span class="live-tag">EN VIVO</span>
+                            <span class="country-tag">${ch.country || ''}</span>
+                        </div>
+                        <div class="sports-channel-info">
+                            <h3>${ch.name}</h3>
+                            <p>${ch.description || ''}</p>
+                            <button class="watch-btn">📺 Ver Canal</button>
+                        </div>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            // Empty state
+            if (matches.length === 0 && channels.length === 0) {
+                html = `<div class="sports-loading">No hay contenido deportivo disponible en este momento.</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function openSportsMatchFromPage(match) {
+            // Build channels list from match.channels or fallback to sportsChannels
+            const matchChannels = (match.channels || []).map(c => {
+                // Try to find channel in sportsChannels by name match
+                const found = S.sportsChannels.find(sc =>
+                    c.name.toLowerCase().includes(sc.name.toLowerCase()) ||
+                    sc.name.toLowerCase().includes(c.name.toLowerCase())
+                );
+                return found || { name: c.name, id: c.id, logo: '', description: c.name, country: match.league || '', bgColor: '#1a1a2e' };
+            });
+
+            // If no match channels, use all sports channels
+            const channelsToShow = matchChannels.length > 0 ? matchChannels : S.sportsChannels;
+
+            const existing = document.getElementById('sports-modal-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'sports-modal-overlay';
+            overlay.className = 'sports-modal-overlay';
+
+            const homeBadge = match.homeBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(match.homeTeam || '?')}&background=1a1a2e&color=fff&size=64`;
+            const awayBadge = match.awayBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(match.awayTeam || '?')}&background=16213e&color=fff&size=64`;
+            const score = (match.homeScore !== null && match.awayScore !== null) ? `${match.homeScore} - ${match.awayScore}` : 'vs';
+            const minute = match.minute || match.status || 'En vivo';
+            const league = match.league || '';
+            const date = match.date || '';
+            const time = match.time || '';
+            const venue = match.venue || '';
+
+            const channelsHtml = channelsToShow.length > 0
+                ? channelsToShow.map(ch => {
+                    const chData = encodeURIComponent(JSON.stringify(ch));
+                    return `<div class="sports-ch-btn" onclick='openSportsChannelDetail(decodeURIComponent("${chData}"))'>
+                        <img class="sports-ch-logo" src="${ch.logo}" alt="${ch.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/32/13131e/78788e?text=TV'">
+                        <span class="sports-ch-name">${ch.name}</span>
+                        <span class="sports-ch-live">EN VIVO</span>
+                    </div>`;
+                }).join('')
+                : '<div class="sports-no-channels">No hay canales disponibles para este partido.</div>';
+
+            overlay.innerHTML = `
+                <div class="sports-modal-backdrop" onclick="document.getElementById('sports-modal-overlay')?.remove()"></div>
+                <div class="sports-modal">
+                    <button class="sports-modal-close" onclick="document.getElementById('sports-modal-overlay')?.remove()">✕</button>
+                    <div class="sports-modal-header">
+                        <div class="sports-modal-teams">
+                            <div class="sports-modal-team">
+                                <img class="sports-modal-crest" src="${homeBadge}" alt="${match.homeTeam}">
+                                <span class="sports-modal-team-name">${match.homeTeam || 'Local'}</span>
+                            </div>
+                            <div class="sports-modal-score-wrap">
+                                <span class="sports-modal-score">${score}</span>
+                                <span class="sports-modal-minute">${minute}</span>
+                            </div>
+                            <div class="sports-modal-team">
+                                <img class="sports-modal-crest" src="${awayBadge}" alt="${match.awayTeam}">
+                                <span class="sports-modal-team-name">${match.awayTeam || 'Visitante'}</span>
+                            </div>
+                        </div>
+                        <div class="sports-modal-meta">
+                            ${league ? `<span>🏆 ${league}</span>` : ''}
+                            ${date ? `<span>📅 ${date}</span>` : ''}
+                            ${time ? `<span>⏰ ${time}</span>` : ''}
+                            ${venue ? `<span>📍 ${venue}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="sports-modal-body">
+                        <h4 class="sports-modal-subtitle">📺 Canales Disponibles</h4>
+                        <div class="sports-ch-list">${channelsHtml}</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+        }
+
+        function openSportsChannelDetail(channel) {
+            // Stop any playing sports HLS
+            if (S.sportsHls) {
+                S.sportsHls.destroy();
+                S.sportsHls = null;
+            }
+
+            S.sportsDetailChannel = channel;
+            S.prevView = S.view;
+
+            const container = document.getElementById('sports-detail-content');
+            if (!container) return;
+
+            // Switch to sports detail view
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-sports-detail').classList.add('active');
+            document.querySelector('.main').scrollTop = 0;
+
+            container.innerHTML = `
+                <div class="sports-player-wrap">
+                    <div class="sports-player-header">
+                        <img src="${channel.logo}" alt="${channel.name}" onerror="this.src='https://via.placeholder.com/48/13131e/78788e?text=TV'">
+                        <div>
+                            <h2>${channel.name}</h2>
+                            <span class="live-indicator">● EN VIVO</span>
+                        </div>
+                    </div>
+                    <div class="sports-player-container" id="sports-player-container">
+                        <div class="player-loader" id="sports-player-loader">
+                            <div class="spinner"></div>
+                            <span>Conectando con el canal...</span>
+                        </div>
+                        <video id="sports-video-el" controls playsinline style="width:100%;height:100%;display:none"></video>
+                    </div>
+                    <div style="padding:16px 0">
+                        <p style="font-size:13px;color:var(--text-dim);line-height:1.6">${channel.description || ''}</p>
+                        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                            <span style="font-size:11px;padding:4px 10px;background:var(--surface);border-radius:6px;color:var(--text-dim)">${channel.country || ''}</span>
+                            <span style="font-size:11px;padding:4px 10px;background:rgba(46,213,115,.1);border-radius:6px;color:var(--green)">● EN VIVO</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Load the channel stream
+            loadSportsChannelStream(channel);
+        }
+
+        async function loadSportsChannelStream(channel) {
+            const loader = document.getElementById('sports-player-loader');
+            const video = document.getElementById('sports-video-el');
+            if (!loader || !video) return;
+
+            try {
+                // Use channel.url (futbol-libre.su URL) for the channel-player API
+                const futbolLibreUrl = channel.url || `https://futbol-libre.su/${channel.slug || channel.id}/`;
+                const resp = await fetch(`/api/channel-player?url=${encodeURIComponent(futbolLibreUrl)}`);
+                const data = await resp.json();
+
+                if (!data.success || !data.url) {
+                    loader.innerHTML = '<span style="color:#e74c3c">Error: No se pudo obtener la señal del canal</span>';
+                    return;
+                }
+
+                // Play with hls.js
+                video.style.display = 'block';
+                if (Hls.isSupported()) {
+                    S.sportsHls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                    S.sportsHls.loadSource(data.url);
+                    S.sportsHls.attachMedia(video);
+                    S.sportsHls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        loader.style.display = 'none';
+                        video.play().catch(() => {});
+                    });
+                    S.sportsHls.on(Hls.Events.ERROR, (_, ev) => {
+                        if (ev.fatal) {
+                            loader.style.display = 'none';
+                            loader.innerHTML = '<span style="color:#e74c3c">Error al reproducir la señal</span>';
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = data.url;
+                    video.addEventListener('loadedmetadata', () => {
+                        loader.style.display = 'none';
+                        video.play().catch(() => {});
+                    });
+                } else {
+                    loader.innerHTML = '<span style="color:#e74c3c">Tu navegador no soporta reproducción HLS</span>';
+                }
+            } catch (e) {
+                console.error('Error loading sports channel:', e);
+                loader.innerHTML = '<span style="color:#e74c3c">Error de conexión: ' + e.message + '</span>';
+            }
+        }
+
+        function goBackSports() {
+            // Stop sports HLS
+            if (S.sportsHls) {
+                S.sportsHls.destroy();
+                S.sportsHls = null;
+            }
+            const video = document.getElementById('sports-video-el');
+            if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
+            switchView('sports');
+        }
+
+        function renderSportsSection() {
+            if (!S.liveMatches || S.liveMatches.length === 0) {
+                return '<div class="sports-section"><div class="sports-header"><span class="sports-icon">⚽</span><h3 class="sports-title">Partidos en Vivo</h3><span class="sports-badge">Sin partidos ahora</span></div></div>';
+            }
+            const matches = S.liveMatches.slice(0, 10);
+            const cards = matches.map(m => {
+                const homeBadge = m.homeBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.homeTeam || '?')}&background=1a1a2e&color=fff&size=64`;
+                const awayBadge = m.awayBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.awayTeam || '?')}&background=16213e&color=fff&size=64`;
+                const score = (m.homeScore !== undefined && m.awayScore !== undefined) ? `${m.homeScore} - ${m.awayScore}` : 'vs';
+                const minute = m.minute || m.status || '';
+                const league = m.league || '';
+                const matchData = encodeURIComponent(JSON.stringify(m));
+                return `<div class="sports-card" onclick='openSportsMatch(decodeURIComponent("${matchData}"))'>
+                    <div class="sports-card-top">
+                        <span class="sports-league">${league}</span>
+                        ${minute ? `<span class="sports-minute">${minute}</span>` : ''}
+                    </div>
+                    <div class="sports-card-teams">
+                        <div class="sports-team">
+                            <img class="sports-crest" src="${homeBadge}" alt="${m.homeTeam}" loading="lazy" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(m.homeTeam || '?')}&background=1a1a2e&color=fff&size=64'">
+                            <span class="sports-team-name">${m.homeTeam || 'Local'}</span>
+                        </div>
+                        <div class="sports-score">${score}</div>
+                        <div class="sports-team">
+                            <img class="sports-crest" src="${awayBadge}" alt="${m.awayTeam}" loading="lazy" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(m.awayTeam || '?')}&background=16213e&color=fff&size=64'">
+                            <span class="sports-team-name">${m.awayTeam || 'Visitante'}</span>
+                        </div>
+                    </div>
+                    <div class="sports-card-bottom">
+                        <span class="sports-watch-btn">📺 Ver Partido</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `<div class="sports-section">
+                <div class="sports-header">
+                    <span class="sports-icon">⚽</span>
+                    <h3 class="sports-title">Partidos en Vivo</h3>
+                    <span class="sports-badge">${S.liveMatches.length} partidos</span>
+                </div>
+                <div class="sports-row">${cards}</div>
+            </div>`;
+        }
+
+        function openSportsMatch(match) {
+            // Create modal overlay for sports match
+            const existing = document.getElementById('sports-modal-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'sports-modal-overlay';
+            overlay.className = 'sports-modal-overlay';
+
+            const homeBadge = match.homeBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(match.homeTeam || '?')}&background=1a1a2e&color=fff&size=64`;
+            const awayBadge = match.awayBadge || `https://ui-avatars.com/api/?name=${encodeURIComponent(match.awayTeam || '?')}&background=16213e&color=fff&size=64`;
+            const score = (match.homeScore !== undefined && match.awayScore !== undefined) ? `${match.homeScore} - ${match.awayScore}` : 'vs';
+            const minute = match.minute || match.status || 'En vivo';
+            const league = match.league || '';
+            const date = match.date || '';
+            const time = match.time || '';
+            const venue = match.venue || '';
+
+            // Find sports channels from S.sportsChannels
+            const sportsChannels = S.sportsChannels || [];
+
+            const channelsHtml = sportsChannels.length > 0
+                ? sportsChannels.map(ch => {
+                    const chData = encodeURIComponent(JSON.stringify(ch));
+                    return `<div class="sports-ch-btn" onclick='openSportsChannelDetail(decodeURIComponent("${chData}"))'>
+                        <img class="sports-ch-logo" src="${ch.logo}" alt="${ch.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/32/13131e/78788e?text=TV'">
+                        <span class="sports-ch-name">${ch.name}</span>
+                        <span class="sports-ch-live">EN VIVO</span>
+                    </div>`;
+                }).join('')
+                : '<div class="sports-no-channels">No hay canales deportivos disponibles en este momento.</div>';
+
+            overlay.innerHTML = `
+                <div class="sports-modal-backdrop" onclick="document.getElementById('sports-modal-overlay')?.remove()"></div>
+                <div class="sports-modal">
+                    <button class="sports-modal-close" onclick="document.getElementById('sports-modal-overlay')?.remove()">✕</button>
+                    <div class="sports-modal-header">
+                        <div class="sports-modal-teams">
+                            <div class="sports-modal-team">
+                                <img class="sports-modal-crest" src="${homeBadge}" alt="${match.homeTeam}">
+                                <span class="sports-modal-team-name">${match.homeTeam || 'Local'}</span>
+                            </div>
+                            <div class="sports-modal-score-wrap">
+                                <span class="sports-modal-score">${score}</span>
+                                <span class="sports-modal-minute">${minute}</span>
+                            </div>
+                            <div class="sports-modal-team">
+                                <img class="sports-modal-crest" src="${awayBadge}" alt="${match.awayTeam}">
+                                <span class="sports-modal-team-name">${match.awayTeam || 'Visitante'}</span>
+                            </div>
+                        </div>
+                        <div class="sports-modal-meta">
+                            ${league ? `<span>🏆 ${league}</span>` : ''}
+                            ${date ? `<span>📅 ${date}</span>` : ''}
+                            ${time ? `<span>⏰ ${time}</span>` : ''}
+                            ${venue ? `<span>📍 ${venue}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="sports-modal-body">
+                        <h4 class="sports-modal-subtitle">📺 Canales Deportivos Disponibles</h4>
+                        <div class="sports-ch-list">${channelsHtml}</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+        }
+
+        async function loadData(endpoint, setter) {
+            try {
+                const r = await fetch(API + endpoint);
+                const j = await r.json();
+                setter(j.data || []);
+            } catch (e) { console.warn('Error cargando', endpoint, e); }
+        }
+
+        async function checkStatus() {
+            try {
+                const r = await fetch('/');
+                document.getElementById('s-dot').classList.toggle('on', r.ok);
+                document.getElementById('s-text').textContent = r.ok ? 'Servidor Online' : 'Inestable';
+            } catch {
+                document.getElementById('s-text').textContent = 'Offline';
+            }
+        }
+
+        // ===== NAVIGATION =====
+        function switchView(name) {
+            S.prevView = S.view;
+            S.view = name;
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            const viewEl = document.getElementById('view-' + name);
+            if (viewEl) viewEl.classList.add('active');
+            document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+            const navBtn = document.getElementById('nav-' + name);
+            if (navBtn) navBtn.classList.add('active');
+            document.getElementById('search-input').value = '';
+
+            // Scroll al inicio
+            document.querySelector('.main').scrollTop = 0;
+
+            if (name === 'home') renderHome();
+            else if (name === 'movies') renderMovies();
+            else if (name === 'series') renderSeries();
+            else if (name === 'tv') renderTV();
+            else if (name === 'anime') renderAnime();
+            else if (name === 'sports') renderSportsPage();
+        }
+
+        function goBack() {
+            stopPlayer();
+            switchView(S.prevView || 'home');
+        }
+
+        // ===== RENDER HOME =====
+        function renderHome() {
+            const c = document.getElementById('home-content');
+            let html = '';
+
+            // Hero
+            const hero = S.nowPlaying[0] || S.movies[0];
+            if (hero) {
+                html += `
+            <div class="hero" onclick='openDetail(${JSON.stringify(hero).replace(/'/g, "&#39;")})'>
+                <div class="hero-bg" style="background-image:url(${hero.backdrop || hero.poster})"></div>
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <span class="hero-badge">${hero.category || 'Estreno'}</span>
+                    <h1 class="hero-title">${hero.title}</h1>
+                    <p class="hero-desc">${hero.overview}</p>
+                    <button class="hero-btn" onclick="event.stopPropagation();openDetail(${JSON.stringify(hero).replace(/'/g, "&#39;")})">▶ Ver Ahora</button>
+                </div>
+            </div>`;
+            }
+
+            // Provider pills
+            html += `<div class="providers" id="home-providers">
+            <span class="prov-pill active" onclick="filterProvider(null, this)">🏠 Todo</span>
+            <span class="prov-pill" onclick="filterProvider(8, this)" style="--p-color:#E50914">🔴 Netflix</span>
+            <span class="prov-pill" onclick="filterProvider(9, this)" style="--p-color:#00A8E1">🔵 Prime Video</span>
+            <span class="prov-pill" onclick="filterProvider(337, this)" style="--p-color:#1a9fef">🟢 Disney+</span>
+            <span class="prov-pill" onclick="filterProvider(350, this)">⚪ Apple TV+</span>
+            <span class="prov-pill" onclick="filterProvider(1899, this)" style="--p-color:#9933FF">🟣 Max</span>
+        </div>`;
+
+            // Sports section (live matches)
+            html += '<div id="home-sports-section">' + renderSportsSection() + '</div>';
+
+            // Shelves container
+            html += '<div id="home-shelves"></div>';
+            c.innerHTML = html;
+
+            // Render shelves
+            renderHomeShelves();
+        }
+
+        async function renderHomeShelves() {
+            const container = document.getElementById('home-shelves');
+            if (!container) return;
+            let html = '';
+
+            if (S.provFilter) {
+                // Filtrar por proveedor
+                container.innerHTML = '<div class="loading-box"><div class="spinner"></div><span class="loading-text">Cargando catálogo...</span></div>';
+                try {
+                    const [movR, serR] = await Promise.all([
+                        fetch(`${API}/discover/provider/${S.provFilter}?type=movie`).then(r => r.json()),
+                        fetch(`${API}/discover/provider/${S.provFilter}?type=tv`).then(r => r.json())
+                    ]);
+                    const provMovies = movR.data || [];
+                    const provSeries = serR.data || [];
+                    html += renderShelf('🎬 Películas', provMovies);
+                    html += renderShelf('📺 Series', provSeries);
+                    if (!provMovies.length && !provSeries.length) html = '<div class="no-results">No se encontró contenido para este proveedor en tu región.</div>';
+                } catch { html = '<div class="no-results">Error cargando contenido del proveedor.</div>'; }
+            } else {
+                // Shelves normales
+                if (S.nowPlaying.length) html += renderShelf('🔥 Estrenos en Cartelera', S.nowPlaying);
+                if (S.trending.length) html += renderShelf('📈 Tendencias de la Semana', S.trending);
+                if (S.movies.length) html += renderShelf('🎬 Películas Populares', S.movies);
+                if (S.trendingSeries.length) html += renderShelf('📺 Series en Tendencia', S.trendingSeries);
+                if (S.series.length) html += renderShelf('🌟 Series Populares', S.series);
+
+                // Genre shelves from existing data
+                const actionMovies = S.movies.filter(m => m.genre_ids?.includes(28) || m.genres?.includes('Acción'));
+                if (actionMovies.length >= 3) html += renderShelf('💥 Acción', actionMovies);
+
+                const scifiMovies = S.movies.filter(m => m.genre_ids?.includes(878) || m.genres?.includes('Ciencia Ficción'));
+                if (scifiMovies.length >= 3) html += renderShelf('🚀 Ciencia Ficción', scifiMovies);
+
+                const comedyMovies = S.movies.filter(m => m.genre_ids?.includes(35) || m.genres?.includes('Comedia'));
+                if (comedyMovies.length >= 3) html += renderShelf('😂 Comedia', comedyMovies);
+
+                const dramaMovies = S.movies.filter(m => m.genre_ids?.includes(18) || m.genres?.includes('Drama'));
+                if (dramaMovies.length >= 3) html += renderShelf('🎭 Drama', dramaMovies);
+
+                // TV shelf
+                if (S.channels.length) html += renderShelf('📡 TV en Vivo', S.channels.slice(0, 15), true);
+            }
+            container.innerHTML = html;
+        }
+
+        function filterProvider(id, el) {
+            S.provFilter = id;
+            document.querySelectorAll('.prov-pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+            renderHomeShelves();
+        }
+
+        // ===== RENDER SHELF =====
+        function renderShelf(title, items, isTV = false) {
+            if (!items || !items.length) return '';
+            return `<div class="shelf">
+            <div class="shelf-head"><h3 class="shelf-title">${title}</h3></div>
+            <div class="shelf-row">${items.map(i => isTV ? renderChannelShelfCard(i) : renderPosterCard(i)).join('')}</div>
+        </div>`;
+        }
+
+        function renderPosterCard(item) {
+            const data = JSON.stringify(item).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            return `<div class="p-card" onclick='openDetail(${data})'>
+            <span class="p-rating">⭐ ${item.rating || '?'}</span>
+            <img class="thumb" src="${item.poster}" alt="${item.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450/13131e/78788e?text=${encodeURIComponent(item.title || '?')}'">
+            <div class="p-info">
+                <div class="p-title">${item.title}</div>
+                <div class="p-meta"><span style="color:var(--accent);font-weight:700;text-transform:uppercase;font-size:9px">${item.category || ''}</span><span>•</span><span>${item.year || ''}</span></div>
+            </div>
+        </div>`;
+        }
+
+        function renderChannelShelfCard(ch) {
+            const data = JSON.stringify(ch).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            return `<div class="p-card" onclick='openDetail(${data})' style="flex:0 0 170px">
+            <div style="aspect-ratio:16/10;background:var(--surface);display:flex;align-items:center;justify-content:center;padding:16px">
+                <img src="${ch.logo}" alt="${ch.name}" style="max-width:80%;max-height:80%;object-fit:contain" loading="lazy" onerror="this.parentElement.innerHTML='<span style=font-size:28px>📡</span>'">
+            </div>
+            <div class="p-info">
+                <div class="p-title">${ch.name}</div>
+                <div class="p-meta"><span style="color:var(--green);font-weight:700;font-size:9px">${ch.genre || 'TV'}</span><span>•</span><span>${ch.country || ''}</span></div>
+            </div>
+        </div>`;
+        }
+
+        // ===== RENDER MOVIES =====
+        function renderMovies() {
+            const genres = [
+                { id: 'all', l: '🎬 Todos' }, { id: 28, l: '💥 Acción' }, { id: 878, l: '🚀 Ciencia Ficción' },
+                { id: 35, l: '😂 Comedia' }, { id: 18, l: '🎭 Drama' }, { id: 16, l: '👾 Animación' },
+                { id: 27, l: '🧟 Terror' }, { id: 53, l: '🔪 Suspenso' }, { id: 12, l: '🗺️ Aventura' },
+                { id: 10749, l: '❤️ Romance' }, { id: 14, l: '🧙 Fantasía' }
+            ];
+            const bar = document.getElementById('movie-genre-bar');
+            bar.innerHTML = genres.map(g => `<span class="g-pill ${S.movieGenre == g.id ? 'active' : ''}" onclick="setMovieGenre(${typeof g.id === 'string' ? `'${g.id}'` : g.id},this)">${g.l}</span>`).join('');
+
+            let filtered = S.movies;
+            if (S.movieGenre !== 'all') {
+                filtered = S.movies.filter(m => m.genre_ids?.includes(S.movieGenre) || m.genres?.includes(GENRES[S.movieGenre]));
+            }
+            document.getElementById('movie-grid').innerHTML = filtered.length
+                ? filtered.map(renderPosterCard).join('')
+                : '<div class="no-results">No hay películas para este género. Intenta con otro filtro.</div>';
+        }
+
+        const GENRES_JS = { 28: 'Acción', 12: 'Aventura', 16: 'Animación', 35: 'Comedia', 80: 'Crimen', 99: 'Documental', 18: 'Drama', 10751: 'Familia', 14: 'Fantasía', 36: 'Historia', 27: 'Terror', 10402: 'Música', 9648: 'Misterio', 10749: 'Romance', 878: 'Ciencia Ficción', 53: 'Suspenso', 10752: 'Bélica', 37: 'Western' };
+
+        async function setMovieGenre(genreId, el) {
+            S.movieGenre = genreId;
+            document.querySelectorAll('#movie-genre-bar .g-pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+
+            if (genreId !== 'all' && S.movies.filter(m => m.genre_ids?.includes(genreId)).length < 5) {
+                // Fetch from API for richer results
+                try {
+                    const r = await fetch(`${API}/discover/genre/${genreId}?type=movie`);
+                    const j = await r.json();
+                    if (j.data?.length) {
+                        document.getElementById('movie-grid').innerHTML = j.data.map(renderPosterCard).join('');
+                        return;
+                    }
+                } catch { }
+            }
+            renderMovies();
+        }
+
+        // ===== RENDER SERIES =====
+        function renderSeries() {
+            const genres = [
+                { id: 'all', l: '📺 Todas' }, { id: 18, l: '🎭 Drama' }, { id: 10765, l: '🚀 Sci-Fi' },
+                { id: 35, l: '😂 Comedia' }, { id: 80, l: '🚨 Crimen' }, { id: 9648, l: '🔍 Misterio' },
+                { id: 10759, l: '💥 Acción' }, { id: 16, l: '👾 Animación' }, { id: 10749, l: '❤️ Romance' }
+            ];
+            const bar = document.getElementById('series-genre-bar');
+            bar.innerHTML = genres.map(g => `<span class="g-pill ${S.seriesGenre == g.id ? 'active' : ''}" onclick="setSeriesGenre(${typeof g.id === 'string' ? `'${g.id}'` : g.id},this)">${g.l}</span>`).join('');
+
+            let filtered = S.series;
+            if (S.seriesGenre !== 'all') {
+                filtered = S.series.filter(s => s.genre_ids?.includes(S.seriesGenre) || s.genres?.includes(GENRES_JS[S.seriesGenre]));
+            }
+            document.getElementById('series-grid').innerHTML = filtered.length
+                ? filtered.map(renderPosterCard).join('')
+                : '<div class="no-results">No hay series para este género.</div>';
+        }
+
+        async function setSeriesGenre(genreId, el) {
+            S.seriesGenre = genreId;
+            document.querySelectorAll('#series-genre-bar .g-pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+            if (genreId !== 'all' && S.series.filter(s => s.genre_ids?.includes(genreId)).length < 5) {
+                try {
+                    const r = await fetch(`${API}/discover/genre/${genreId}?type=tv`);
+                    const j = await r.json();
+                    if (j.data?.length) { document.getElementById('series-grid').innerHTML = j.data.map(renderPosterCard).join(''); return; }
+                } catch { }
+            }
+            renderSeries();
+        }
+
+        // ===== RENDER TV (MAGISTV FOLDER STYLE) =====
+        const TV_FOLDERS = [
+            { id: 'all', icon: '📡', label: 'Todos los Canales' },
+            { id: 'Deportes', icon: '⚽', label: 'Deportes' },
+            { id: 'Noticias', icon: '📰', label: 'Noticias' },
+            { id: 'Cine', icon: '🎬', label: 'Cine y Películas' },
+            { id: 'Series', icon: '📺', label: 'Series' },
+            { id: 'Entretenimiento', icon: '🎭', label: 'Entretenimiento' },
+            { id: 'Música', icon: '🎵', label: 'Música' },
+            { id: 'Infantil', icon: '👶', label: 'Infantil' },
+            { id: 'Animación', icon: '🐭', label: 'Animación' },
+            { id: 'Documentales', icon: '🌍', label: 'Documentales' },
+            { id: 'Generalista', icon: '📡', label: 'Generalista' },
+            { id: 'Educación', icon: '📚', label: 'Educación' },
+            { id: 'Cultura', icon: '🏛️', label: 'Cultura' },
+            { id: 'Política', icon: '🗳️', label: 'Política' },
+            { id: 'Religión', icon: '⛪', label: 'Religión' },
+            { id: 'Familia', icon: '👨‍👩‍👧‍👦', label: 'Familia' },
+            { id: 'Clásicos', icon: '🎞️', label: 'Clásicos' },
+            { id: 'Comedia', icon: '😂', label: 'Comedia' },
+            { id: 'Ciencia', icon: '🔬', label: 'Ciencia' },
+            { id: 'Viajes', icon: '✈️', label: 'Viajes' },
+            { id: 'Cocina', icon: '🍳', label: 'Cocina' },
+            { id: 'Naturaleza', icon: '🌿', label: 'Naturaleza' },
+            { id: 'Motor', icon: '🏎️', label: 'Motor' },
+            { id: 'Compras', icon: '🛍️', label: 'Compras' },
+            { id: 'Relax', icon: '🧘', label: 'Relax' },
+            { id: 'Estilo de Vida', icon: '💅', label: 'Estilo de Vida' },
+            { id: 'Negocios', icon: '💼', label: 'Negocios' },
+        ];
+
+        function renderTV() {
+            S.tvFolder = S.tvFolder || 'all';
+            S.tvCountry = S.tvCountry || 'all';
+            renderTVSidebar();
+            renderTVContent();
+        }
+
+        function renderTVSidebar() {
+            const container = document.getElementById('tv-sidebar-cats');
+            if (!container) return;
+            container.innerHTML = TV_FOLDERS.map(f => {
+                const count = S.tvFolder === f.id
+                    ? (S.tvCountry !== 'all'
+                        ? S.channels.filter(ch => (f.id === 'all' || ch.genre === f.id) && ch.country === S.tvCountry).length
+                        : (f.id === 'all' ? S.channels.length : S.channels.filter(ch => ch.genre === f.id).length))
+                    : (f.id === 'all' ? S.channels.length : S.channels.filter(ch => ch.genre === f.id).length);
+                return `<div class="tv-folder ${S.tvFolder === f.id ? 'active' : ''}" onclick="selectTvFolder('${f.id}')">
+                    <span class="tv-folder-icon">${f.icon}</span>
+                    <span class="tv-folder-name">${f.label}</span>
+                    <span class="tv-folder-count">${count}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function selectTvFolder(folderId) {
+            S.tvFolder = folderId;
+            S.tvCountry = 'all';
+            renderTVSidebar();
+            renderTVContent();
+        }
+
+        function renderTVContent() {
+            const titleEl = document.getElementById('tv-content-title');
+            const countEl = document.getElementById('tv-content-count');
+            const subcatsEl = document.getElementById('tv-subcats');
+            const gridEl = document.getElementById('tv-grid');
+            if (!titleEl || !countEl || !subcatsEl || !gridEl) return;
+
+            const folder = TV_FOLDERS.find(f => f.id === S.tvFolder) || TV_FOLDERS[0];
+            titleEl.textContent = `${folder.icon} ${folder.label}`;
+
+            // Filter channels by folder
+            let filtered = S.tvFolder === 'all' ? S.channels : S.channels.filter(ch => ch.genre === S.tvFolder);
+            if (S.tvCountry !== 'all') filtered = filtered.filter(ch => ch.country === S.tvCountry);
+
+            countEl.textContent = `${filtered.length} canales`;
+
+            // Country sub-categories (pills)
+            const countries = [...new Set(filtered.map(ch => ch.country).filter(Boolean))].sort();
+            subcatsEl.innerHTML = `<span class="tv-subcat ${S.tvCountry === 'all' ? 'active' : ''}" onclick="selectTvCountry('all')">🌐 Todos</span>` +
+                countries.map(c => `<span class="tv-subcat ${S.tvCountry === c ? 'active' : ''}" onclick="selectTvCountry('${c}')">${c}</span>`).join('');
+
+            // Channel grid
+            gridEl.innerHTML = filtered.length
+                ? filtered.map(renderChannelCard).join('')
+                : '<div class="no-results" style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-dim)">📡 No se encontraron canales en esta categoría.</div>';
+        }
+
+        function selectTvCountry(country) {
+            S.tvCountry = country;
+            renderTVContent();
+            renderTVSidebar();
+        }
+
+        function renderChannelCard(ch) {
+            const data = JSON.stringify(ch).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            return `<div class="ch-card" onclick='openDetail(${data})'>
+            <img class="ch-logo" src="${ch.logo}" alt="${ch.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/48/13131e/78788e?text=TV'">
+            <div class="ch-info">
+                <div class="ch-name">${ch.name}</div>
+                <div class="ch-meta"><span>${ch.genre || 'TV'}</span><span>•</span><span>${ch.country || ''}</span></div>
+            </div>
+            <span class="ch-live">EN VIVO</span>
+        </div>`;
+        }
+
+        // ===== DETAIL VIEW =====
+        function openDetail(item) {
+            stopPlayer();
+            S.detailItem = item;
+            S.prevView = S.view;
+
+            document.getElementById('d-poster').src = item.poster || item.logo || '';
+            document.getElementById('d-poster').onerror = function () { this.src = 'https://via.placeholder.com/300x450/13131e/78788e?text=' + encodeURIComponent(item.title || item.name || '?'); };
+            document.getElementById('d-title').textContent = item.title || item.name || '';
+
+            const isTV = item.category === 'TV';
+            const isSerie = item.category === 'Serie';
+            document.getElementById('d-cat').textContent = isTV ? 'TV en Vivo' : (item.category || 'Película');
+
+            const langAlert = document.getElementById('language-alert');
+            if (langAlert) {
+                langAlert.style.display = isTV ? 'none' : 'flex';
+            }
+
+            // Tags
+            let tagsHtml = '';
+            if (item.year) tagsHtml += `<span class="d-tag">${item.year}</span>`;
+            if (item.rating && item.rating !== '0.0') tagsHtml += `<span class="d-tag gold">⭐ ${item.rating}</span>`;
+            if (isTV && item.country) tagsHtml += `<span class="d-tag">${item.country}</span>`;
+            if (isTV && item.genre) tagsHtml += `<span class="d-tag">${item.genre}</span>`;
+            if (Array.isArray(item.genres)) item.genres.forEach(g => tagsHtml += `<span class="d-tag">${g}</span>`);
+            document.getElementById('d-tags').innerHTML = tagsHtml;
+
+            // Overview
+            document.getElementById('d-overview').textContent = item.overview || (isTV ? `Canal de televisión: ${item.name}. Señal en vivo HD.` : 'Sin descripción disponible.');
+
+            // FASE 3: Show/hide season/episode sections
+            const seasonSection = document.getElementById('season-section');
+            const episodeSection = document.getElementById('episode-section');
+            if (seasonSection) seasonSection.style.display = isSerie ? 'block' : 'none';
+            if (episodeSection) episodeSection.style.display = isSerie ? 'block' : 'none';
+
+            // Reset series state
+            S.seriesDetail = null;
+            S.selectedSeason = 1;
+            S.selectedEpisode = 1;
+            S.episodes = [];
+
+            // Servers
+            const srvList = document.getElementById('srv-list');
+            if (isTV) {
+                // Detectar si es canal latamvidz (vía channel-player API) o HLS directo
+                const isLatamVidz = item.source === 'latamvidz' || /channel-player|futbol-libre\.su|latamvidz|canal\.php/i.test(item.url || '');
+                if (isLatamVidz) {
+                    srvList.innerHTML = `
+                    <div class="srv-btn active" onclick="loadLatamVidzChannel('${item.id}', this)">
+                        <span class="srv-icon">📺</span>
+                        <div class="srv-info"><div class="srv-name">${item.name}</div><div class="srv-sub">Canal deportivo en español</div></div>
+                        <span class="srv-badge">FHD</span>
+                    </div>`;
+                    loadLatamVidzChannel(item.id);
+                } else {
+                    srvList.innerHTML = `
+                    <div class="srv-btn active" onclick="loadStream('${item.url}', true, this)">
+                        <span class="srv-icon">⚡</span>
+                        <div class="srv-info"><div class="srv-name">Señal Directa HLS</div><div class="srv-sub">Transmisión en vivo sin intermediarios</div></div>
+                        <span class="srv-badge">HD</span>
+                    </div>`;
+                    loadStream(item.url, true);
+                }
+            } else {
+                // FASE 4: Load dynamic servers from API
+                srvList.innerHTML = `<div class="loading-box" style="padding:20px;text-align:center"><div class="spinner"></div><span class="loading-text">Buscando servidores disponibles...</span></div>`;
+                loadDynamicServers(item.id, isSerie);
+            }
+
+            // FASE 3: Load series details (seasons)
+            if (isSerie) {
+                loadSeriesSeasons(item.id);
+            }
+
+            // Show view
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-detail').classList.add('active');
+            document.querySelector('.main').scrollTop = 0;
+        }
+
+        // ===== FASE 3: SERIES SEASONS & EPISODES =====
+        async function loadSeriesSeasons(seriesId) {
+            try {
+                const r = await fetch(`${API}/series/${seriesId}`);
+                const j = await r.json();
+                const data = j.data || j;
+                S.seriesDetail = data;
+
+                if (data.seasons && data.seasons.length > 0) {
+                    // Find first season with episodes (season_number > 0)
+                    const firstSeason = data.seasons.find(s => s.season_number > 0) || data.seasons[0];
+                    S.selectedSeason = firstSeason.season_number;
+                    renderSeasons(data.seasons);
+                    loadEpisodes(seriesId, S.selectedSeason);
+                }
+            } catch (e) {
+                console.warn('Error loading series details:', e);
+            }
+        }
+
+        function renderSeasons(seasons) {
+            const container = document.getElementById('season-list');
+            if (!container) return;
+            const validSeasons = seasons.filter(s => s.season_number > 0);
+            container.innerHTML = validSeasons.map(s => `
+                <div class="ep-btn ${s.season_number === S.selectedSeason ? 'active' : ''}"
+                     onclick="selectSeason(${s.season_number}, this)">
+                    Temporada ${s.season_number}
+                    ${s.episode_count ? `<span class="ep-count">${s.episode_count} eps</span>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function selectSeason(num, el) {
+            S.selectedSeason = num;
+            document.querySelectorAll('#season-list .ep-btn').forEach(b => b.classList.remove('active'));
+            if (el) el.classList.add('active');
+            loadEpisodes(S.detailItem.id, num);
+        }
+
+        async function loadEpisodes(seriesId, seasonNum) {
+            const container = document.getElementById('episode-list');
+            if (!container) return;
+            container.innerHTML = '<div class="loading-box" style="padding:10px"><div class="spinner" style="width:20px;height:20px"></div></div>';
+            try {
+                const r = await fetch(`${API}/series/${seriesId}/season/${seasonNum}`);
+                const j = await r.json();
+                const data = j.data || j;
+                const episodes = data.episodes || data || [];
+                S.episodes = episodes;
+                S.selectedEpisode = episodes.length > 0 ? episodes[0].episode_number : 1;
+                renderEpisodes(episodes);
+                // Reload streams for new season/episode
+                if (S.detailItem) {
+                    loadDynamicServers(seriesId, true);
+                }
+            } catch (e) {
+                console.warn('Error loading episodes:', e);
+                container.innerHTML = '<div class="no-results">Error al cargar episodios</div>';
+            }
+        }
+
+        function renderEpisodes(episodes) {
+            const container = document.getElementById('episode-list');
+            if (!container) return;
+            if (!episodes || !episodes.length) {
+                container.innerHTML = '<div class="no-results">No hay episodios disponibles</div>';
+                return;
+            }
+            container.innerHTML = episodes.map(ep => `
+                <div class="ep-btn ${ep.episode_number === S.selectedEpisode ? 'active' : ''}"
+                     onclick="selectEpisode(${ep.episode_number}, this)">
+                    <div class="ep-num">${ep.episode_number}</div>
+                    <div class="ep-info">
+                        <div class="ep-name">${ep.name || `Episodio ${ep.episode_number}`}</div>
+                        ${ep.overview ? `<div class="ep-overview">${ep.overview.substring(0, 80)}${ep.overview.length > 80 ? '...' : ''}</div>` : ''}
+                    </div>
+                    ${ep.still_path ? `<img class="ep-still" src="https://image.tmdb.org/t/p/w154${ep.still_path}" alt="">` : ''}
+                </div>
+            `).join('');
+        }
+
+        function selectEpisode(num, el) {
+            S.selectedEpisode = num;
+            document.querySelectorAll('#episode-list .ep-btn').forEach(b => b.classList.remove('active'));
+            if (el) el.classList.add('active');
+            // Reload streams for new episode
+            if (S.detailItem) {
+                loadDynamicServers(S.detailItem.id, true);
+            }
+        }
+
+        // ===== FASE 4: DYNAMIC SERVERS FROM API =====
+        async function loadDynamicServers(id, isSerie) {
+            const srvList = document.getElementById('srv-list');
+            S.streamsLoading = true;
+
+            try {
+                let url;
+                if (isSerie) {
+                    url = `${API}/stream/tv/${id}/${S.selectedSeason}/${S.selectedEpisode}`;
+                } else {
+                    url = `${API}/stream/movie/${id}`;
+                }
+
+                const r = await fetch(url);
+                const j = await r.json();
+
+                S.streamsLoading = false;
+
+                if (j.success && j.streams && j.streams.length > 0) {
+                    S.streams = j.streams;
+
+                    let html = '';
+
+                    // All servers are available (backend marks all as alive)
+                    html += `<div class="srv-group-label" style="color:var(--text-dim);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:4px 0 8px">🇪🇸 Servidores en Español (${j.streams.length})</div>`;
+                    j.streams.forEach((s, i) => {
+                        const qualityColor = s.quality === 'FHD' ? 'var(--accent)' : s.quality === 'HD' ? 'var(--gold)' : 'var(--text-dim)';
+                        const qualityBg = s.quality === 'FHD' ? 'rgba(123,91,245,.15)' : s.quality === 'HD' ? 'rgba(253,203,110,.1)' : 'rgba(120,120,142,.1)';
+                        const serverName = s.name || s.server || 'Servidor';
+                        const langLabel = s.lang === 'es' ? 'Español' : (s.lang || 'Español');
+                        const sourceIcon = s.source === 'verhdlink' ? '🇪🇸' : s.source === 'latamvidz' ? '📺' : '🎬';
+                        html += `
+                        <div class="srv-btn ${i === 0 ? 'active' : ''}" onclick="loadStream('${s.url}', false, this)">
+                            <span class="srv-icon">${sourceIcon}</span>
+                            <div class="srv-info">
+                                <div class="srv-name">${serverName}</div>
+                                <div class="srv-sub">${langLabel} • ${s.source === 'verhdlink' ? 'VerHDLink' : s.source === 'latamvidz' ? 'Fútbol Libre TV' : 'Streaming'}</div>
+                            </div>
+                            <span class="srv-badge" style="color:${qualityColor};background:${qualityBg}">${s.quality || 'HD'}</span>
+                        </div>`;
+                    });
+
+                    srvList.innerHTML = html;
+
+                    // Auto-load first stream
+                    if (j.streams.length > 0) {
+                        loadStream(j.streams[0].url, false);
+                    }
+                } else {
+                    // Fallback to hardcoded servers if API returns nothing
+                    fallbackServers(id, isSerie, srvList);
+                }
+            } catch (e) {
+                S.streamsLoading = false;
+                console.warn('Error loading dynamic servers:', e);
+                fallbackServers(id, isSerie, srvList);
+            }
+        }
+
+        function fallbackServers(id, isSerie, srvList) {
+            const p = isSerie ? `tv/${id}/${S.selectedSeason}/${S.selectedEpisode}` : `movie/${id}`;
+            srvList.innerHTML = `
+                <div class="srv-group-label" style="color:var(--text-dim);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:4px 0 8px">🇪🇸 Servidores en Español</div>
+                <div class="srv-btn active" onclick="loadStream('https://verhdlink.cam/${p}', false, this)">
+                    <span class="srv-icon">🇪🇸</span>
+                    <div class="srv-info"><div class="srv-name">VerHDLink</div><div class="srv-sub">Servidor principal en español</div></div>
+                    <span class="srv-badge">FHD</span>
+                </div>
+                <div class="srv-btn" onclick="loadStream('https://pelisflix200.skin/pelicula/${id}/', false, this)">
+                    <span class="srv-icon">🎬</span>
+                    <div class="srv-info"><div class="srv-name">PelisFlix</div><div class="srv-sub">Películas en español latino</div></div>
+                    <span class="srv-badge" style="color:var(--accent);background:var(--accent-dim);border-color:rgba(123,91,245,.25)">FHD</span>
+                </div>
+                <div class="srv-btn" onclick="loadStream('https://repelishd.ceo/ver-pelicula/${id}-online-espanol.html', false, this)">
+                    <span class="srv-icon">📡</span>
+                    <div class="srv-info"><div class="srv-name">RePelisHD</div><div class="srv-sub">Servidor de respaldo en español</div></div>
+                    <span class="srv-badge" style="color:var(--pink);background:rgba(232,67,147,.1);border-color:rgba(232,67,147,.25)">HD</span>
+                </div>`;
+            loadStream(`https://verhdlink.cam/${p}`, false);
+        }
+
+        // ===== CANAL DEPORTIVO (latamvidz vía API) =====
+        // Llama a /api/channel-player que scrapea futbol-libre.su,
+        // proxea latamvidz1.com y extrae la URL M3U8.
+        // Luego reproduce con hls.js nativo.
+        async function loadLatamVidzChannel(channelId, btnEl) {
+            const item = S.detailItem;
+            if (!item || !item.url) return;
+
+            // Active button
+            if (btnEl) {
+                document.querySelectorAll('.srv-btn').forEach(b => b.classList.remove('active'));
+                btnEl.classList.add('active');
+            }
+
+            const wrap = document.getElementById('player-wrap');
+            const loader = document.getElementById('player-loader');
+            const vid = document.getElementById('vid-el');
+            const ifr = document.getElementById('ifr-el');
+            const act = document.getElementById('player-actions');
+            const tabBtn = document.getElementById('btn-open-tab');
+
+            wrap.style.display = 'block';
+            stopPlayer();
+
+            // Mostrar loader
+            ifr.style.display = 'none';
+            vid.style.display = 'block';
+            loader.style.display = 'flex';
+            loader.innerHTML = '<div class="spinner"></div><span class="loading-text">Conectando con el canal...</span>';
+
+            if (act && tabBtn) {
+                act.style.display = 'flex';
+                tabBtn.href = item.url;
+            }
+
+            try {
+                // Llamar a la API del backend que extrae la URL M3U8
+                const resp = await fetch(item.url);
+                const data = await resp.json();
+
+                if (!data.success || !data.url) {
+                    loader.innerHTML = '<span class="loading-text" style="color:#e74c3c">Error: No se pudo obtener la señal</span>';
+                    return;
+                }
+
+                // Reproducir con hls.js
+                if (Hls.isSupported()) {
+                    S.hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                    S.hls.loadSource(data.url);
+                    S.hls.attachMedia(vid);
+                    S.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        loader.style.display = 'none';
+                        vid.play().catch(() => {});
+                    });
+                    S.hls.on(Hls.Events.ERROR, (_, ev) => {
+                        if (ev.fatal) {
+                            loader.style.display = 'none';
+                            console.warn('HLS error fatal:', ev);
+                            vid.innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c">Error al reproducir la señal</div>';
+                        }
+                    });
+                } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Safari native HLS
+                    vid.src = data.url;
+                    vid.addEventListener('loadedmetadata', () => {
+                        loader.style.display = 'none';
+                        vid.play().catch(() => {});
+                    });
+                } else {
+                    loader.innerHTML = '<span class="loading-text" style="color:#e74c3c">Tu navegador no soporta reproducción HLS</span>';
+                }
+            } catch (e) {
+                console.error('Error loading latamvidz channel:', e);
+                loader.innerHTML = '<span class="loading-text" style="color:#e74c3c">Error de conexión: ' + e.message + '</span>';
+            }
+        }
+
+        // ===== PLAYER =====
+        function loadStream(url, isHls, btnEl) {
+            // Active button
+            if (btnEl) {
+                document.querySelectorAll('.srv-btn').forEach(b => b.classList.remove('active'));
+                btnEl.classList.add('active');
+            }
+
+            const wrap = document.getElementById('player-wrap');
+            const loader = document.getElementById('player-loader');
+            const vid = document.getElementById('vid-el');
+            const ifr = document.getElementById('ifr-el');
+            const act = document.getElementById('player-actions');
+            const tabBtn = document.getElementById('btn-open-tab');
+
+            wrap.style.display = 'block';
+            stopPlayer();
+
+            const isEmbed = /vidsrc|embed|2embed|autoembed|iframe|latamvidz|verhdlink|nupload|pelisflix|repelishd|futbol-libre|canal\.php|supervideo|mixdrop|doodstream|dood\.to|waaw\.tv/i.test(url);
+            // Detectar si es nupload.me (podemos resolver la URL HLS directamente)
+            const isNupload = /nupload\.me/i.test(url);
+            let finalUrl = url;
+
+            // Para HLS, usar stream-proxy
+            if (isHls && url.startsWith('http')) {
+                finalUrl = `/api/stream-proxy?url=${encodeURIComponent(url)}`;
+            }
+
+            // Para nupload.me, usar resolve-video para extraer la URL HLS directa
+            // y reproducir con hls.js (como los canales deportivos)
+            if (isNupload && !isHls) {
+                ifr.style.display = 'none';
+                vid.style.display = 'block';
+                loader.style.display = 'flex';
+                loader.innerHTML = '<div class="spinner"></div><span class="loading-text">Resolviendo video...</span>';
+
+                if (act && tabBtn) {
+                    act.style.display = 'flex';
+                    tabBtn.href = url;
+                }
+
+                fetch(`/api/resolve-video?url=${encodeURIComponent(url)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.success || !data.url) {
+                            loader.innerHTML = '<span class="loading-text" style="color:#e74c3c">Error: No se pudo resolver el video</span>';
+                            return;
+                        }
+                        // Intentar reproducir la URL directamente primero (el navegador
+                        // puede acceder a CDNs como ibra.lat que el backend no puede)
+                        // Si falla, reintentar a través del stream-proxy
+                        const playVideo = (videoUrl, isRetry) => {
+                            if (Hls.isSupported()) {
+                                S.hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                                S.hls.loadSource(videoUrl);
+                                S.hls.attachMedia(vid);
+                                S.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                    loader.style.display = 'none';
+                                    vid.play().catch(() => {});
+                                });
+                                S.hls.on(Hls.Events.ERROR, (_, ev) => {
+                                    if (ev.fatal) {
+                                        if (!isRetry) {
+                                            // Reintentar a través del proxy
+                                            console.warn('HLS directo falló, reintentando con proxy');
+                                            S.hls.destroy();
+                                            S.hls = null;
+                                            playVideo(`/api/stream-proxy?url=${encodeURIComponent(data.url)}`, true);
+                                        } else {
+                                            loader.style.display = 'none';
+                                            console.warn('HLS error fatal (proxy):', ev);
+                                        }
+                                    }
+                                });
+                            } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+                                vid.src = videoUrl;
+                                vid.addEventListener('loadedmetadata', () => {
+                                    loader.style.display = 'none';
+                                    vid.play().catch(() => {});
+                                });
+                                vid.addEventListener('error', () => {
+                                    if (!isRetry) {
+                                        vid.src = `/api/stream-proxy?url=${encodeURIComponent(data.url)}`;
+                                    }
+                                });
+                            } else {
+                                loader.innerHTML = '<span class="loading-text" style="color:#e74c3c">Tu navegador no soporta reproducción HLS</span>';
+                            }
+                        };
+                        playVideo(data.url, false);
+                    })
+                    .catch(e => {
+                        console.error('Error resolving video:', e);
+                        loader.innerHTML = '<span class="loading-text" style="color:#e74c3c">Error de conexión: ' + e.message + '</span>';
+                    });
+                return;
+            }
+
+            // Para embeds, usar embed-proxy (el backend fetchea el contenido
+            // y lo sirve a través de nuestro dominio, evitando bloqueos regionales)
+            if (isEmbed && !isHls) {
+                finalUrl = `/api/embed-proxy?url=${encodeURIComponent(url)}`;
+            }
+
+            if (act && tabBtn) {
+                act.style.display = 'flex';
+                tabBtn.href = url;
+            }
+
+            if (isEmbed && !isHls) {
+                loader.style.display = 'none';
+                vid.style.display = 'none';
+                ifr.style.display = 'block';
+                ifr.src = finalUrl;
+
+                // Iframe timeout detection: if iframe doesn't load in 15s, show fallback
+                if (S.iframeTimeout) clearTimeout(S.iframeTimeout);
+                S.iframeTimeout = setTimeout(() => {
+                    try {
+                        const doc = ifr.contentDocument || ifr.contentWindow?.document;
+                        if (doc && doc.body.innerHTML.length < 50) {
+                            showIframeFallback(url, finalUrl);
+                        }
+                    } catch (e) {
+                        const fallbackHint = document.getElementById('iframe-fallback-hint');
+                        if (!fallbackHint) {
+                            const hint = document.createElement('div');
+                            hint.id = 'iframe-fallback-hint';
+                            hint.style.cssText = 'text-align:center;padding:12px;margin-top:8px;font-size:12px;color:var(--text-dim)';
+                            hint.innerHTML = '¿Pantalla negra? <a href="' + url + '" target="_blank" style="color:var(--accent);font-weight:600;text-decoration:none">Abrir en nueva pestaña ↗</a>';
+                            ifr.parentNode?.appendChild(hint);
+                        }
+                    }
+                }, 15000);
+            } else {
+                ifr.style.display = 'none';
+                vid.style.display = 'block';
+                loader.style.display = 'flex';
+
+                if (isHls && Hls.isSupported()) {
+                    S.hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                    S.hls.loadSource(finalUrl);
+                    S.hls.attachMedia(vid);
+                    S.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        loader.style.display = 'none';
+                        vid.play().catch(() => { });
+                    });
+                    S.hls.on(Hls.Events.ERROR, (_, data) => {
+                        if (data.fatal) {
+                            loader.style.display = 'none';
+                            console.warn('HLS error fatal:', data);
+                        }
+                    });
+                } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+                    vid.src = finalUrl;
+                    vid.addEventListener('canplay', function h() {
+                        loader.style.display = 'none';
+                        vid.play().catch(() => { });
+                        vid.removeEventListener('canplay', h);
+                    });
+                } else {
+                    vid.src = finalUrl;
+                    vid.addEventListener('canplay', function h() {
+                        loader.style.display = 'none';
+                        vid.play().catch(() => { });
+                        vid.removeEventListener('canplay', h);
+                    });
+                    vid.addEventListener('error', () => { loader.style.display = 'none'; });
+                }
+            }
+        }
+
+        function stopPlayer() {
+            const vid = document.getElementById('vid-el');
+            const ifr = document.getElementById('ifr-el');
+            const act = document.getElementById('player-actions');
+            if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); }
+            if (ifr) { ifr.src = ''; ifr.style.display = 'none'; }
+            if (act) { act.style.display = 'none'; }
+            if (S.hls) { S.hls.destroy(); S.hls = null; }
+            if (S.iframeTimeout) { clearTimeout(S.iframeTimeout); S.iframeTimeout = null; }
+            // Remove iframe fallback hint
+            const hint = document.getElementById('iframe-fallback-hint');
+            if (hint) hint.remove();
+        }
+
+        function showIframeFallback(originalUrl, proxiedUrl) {
+            const ifr = document.getElementById('ifr-el');
+            if (!ifr) return;
+            // Hide iframe, show fallback message with open-in-tab button
+            ifr.style.display = 'none';
+            const wrap = document.getElementById('player-wrap');
+            if (!wrap) return;
+            const existing = document.getElementById('iframe-fallback');
+            if (existing) existing.remove();
+            const fb = document.createElement('div');
+            fb.id = 'iframe-fallback';
+            fb.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:16px;text-align:center';
+            fb.innerHTML = `
+                <div style="font-size:48px">🎬</div>
+                <div style="font-size:16px;font-weight:700">El reproductor no pudo cargarse</div>
+                <div style="font-size:13px;color:var(--text-dim);max-width:360px">Algunos servidores usan protección que bloquea la carga en iframes. Abre el enlace directamente en tu navegador.</div>
+                <a href="${originalUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:700;text-decoration:none;transition:opacity .2s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+                    ↗ Abrir en nueva pestaña
+                </a>
+                <div style="font-size:11px;color:var(--text-dim)">Si el enlace no funciona, prueba con otro servidor.</div>
+            `;
+            wrap.appendChild(fb);
+        }
+
+        // ===== ANIME =====
+        let S_ANIME = {
+            results: [],
+            currentDetail: null,
+            currentEpisode: null,
+            animeStreams: []
+        };
+
+        function renderAnime() {
+            const content = document.getElementById('anime-content');
+            if (!content) return;
+            // Show welcome screen if no results
+            if (!S_ANIME.results || S_ANIME.results.length === 0) {
+                content.innerHTML = `
+                    <div class="anime-welcome">
+                        <div class="anime-welcome-icon">🎌</div>
+                        <h3 class="anime-welcome-title">Explora el mundo del Anime</h3>
+                        <p class="anime-welcome-text">Busca tus animes favoritos y disfruta de episodios en español.</p>
+                        <div class="anime-suggestions">
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Naruto')">Naruto</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('One Piece')">One Piece</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Dragon Ball')">Dragon Ball</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Attack on Titan')">Attack on Titan</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Demon Slayer')">Demon Slayer</span>
+                            <span class="anime-suggestion" onclick="searchAnimeQuery('Jujutsu Kaisen')">Jujutsu Kaisen</span>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            // Show results grid
+            const grid = S_ANIME.results.map(item => `
+                <div class="anime-card" onclick="openAnimeDetail('${encodeURIComponent(item.url)}', '${item.title.replace(/'/g, "\\'")}')">
+                    <img class="anime-card-img" src="${item.image || 'https://via.placeholder.com/300x400/13131e/78788e?text=Anime'}" alt="${item.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x400/13131e/78788e?text=Anime'">
+                    <div class="anime-card-body">
+                        <div class="anime-card-title">${item.title}</div>
+                        <div class="anime-card-type">Anime</div>
+                    </div>
+                </div>
+            `).join('');
+            content.innerHTML = `<div class="anime-grid">${grid}</div>`;
+        }
+
+        async function searchAnime() {
+            const input = document.getElementById('anime-search-input');
+            const q = input.value.trim();
+            if (!q) return;
+            await searchAnimeQuery(q);
+        }
+
+        async function searchAnimeQuery(query) {
+            const content = document.getElementById('anime-content');
+            if (!content) return;
+            content.innerHTML = '<div class="anime-loading"><div class="spinner"></div><span class="anime-loading-text">Buscando anime...</span></div>';
+
+            try {
+                const r = await fetch(`${API}/anime/search?q=${encodeURIComponent(query)}`);
+                const j = await r.json();
+                S_ANIME.results = j.data?.results || [];
+                renderAnime();
+            } catch (e) {
+                console.warn('Error searching anime:', e);
+                content.innerHTML = '<div class="anime-no-results">Error al buscar. Intenta de nuevo.</div>';
+            }
+        }
+
+        async function openAnimeDetail(urlEncoded, title) {
+            const url = decodeURIComponent(urlEncoded);
+            S_ANIME.currentDetail = { url, title };
+
+            // Switch to anime detail view
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-anime-detail').classList.add('active');
+            document.querySelector('.main').scrollTop = 0;
+
+            const container = document.getElementById('anime-detail-content');
+            container.innerHTML = '<div class="anime-loading"><div class="spinner"></div><span class="anime-loading-text">Cargando información...</span></div>';
+
+            try {
+                const r = await fetch(`${API}/anime/info?url=${encodeURIComponent(url)}`);
+                const j = await r.json();
+                const data = j.data;
+
+                if (!data || !data.title) {
+                    container.innerHTML = '<div class="anime-no-results">No se pudo cargar la información del anime.</div>';
+                    return;
+                }
+
+                const image = data.image || 'https://via.placeholder.com/260x360/13131e/78788e?text=Anime';
+                const episodes = data.episodes || [];
+                const episodeCount = data.episodeCount || episodes.length;
+
+                let episodesHtml = '';
+                if (episodes.length > 0) {
+                    episodesHtml = `
+                        <div class="anime-episodes-label">📺 Episodios (${episodeCount})</div>
+                        <div class="anime-episodes-grid">
+                            ${episodes.map((ep, i) => `
+                                <div class="anime-ep-btn ${i === 0 ? 'active' : ''}" onclick="playAnimeEpisode('${encodeURIComponent(ep.url)}', this, ${i})">
+                                    Ep. ${ep.number}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    episodesHtml = '<div class="anime-no-results" style="padding:20px">No se encontraron episodios.</div>';
+                }
+
+                container.innerHTML = `
+                    <div class="anime-detail-layout">
+                        <div class="anime-detail-poster">
+                            <img src="${image}" alt="${data.title}" onerror="this.src='https://via.placeholder.com/260x360/13131e/78788e?text=Anime'">
+                        </div>
+                        <div class="anime-detail-info">
+                            <h1 class="anime-detail-title">${data.title}</h1>
+                            ${data.description ? `<p class="anime-detail-desc">${data.description}</p>` : ''}
+                            <div class="anime-detail-meta">
+                                <span>🎌 Anime</span>
+                                <span>📺 ${episodeCount} episodios</span>
+                            </div>
+                            ${episodesHtml}
+                            <div id="anime-player-container"></div>
+                        </div>
+                    </div>
+                `;
+
+                // Auto-play first episode
+                if (episodes.length > 0) {
+                    S_ANIME.currentEpisode = 0;
+                    playAnimeEpisode(encodeURIComponent(episodes[0].url), null, 0);
+                }
+            } catch (e) {
+                console.warn('Error loading anime detail:', e);
+                container.innerHTML = '<div class="anime-no-results">Error al cargar la información.</div>';
+            }
+        }
+
+        function goBackAnime() {
+            // Stop any playing anime
+            const playerContainer = document.getElementById('anime-player-container');
+            if (playerContainer) playerContainer.innerHTML = '';
+            S_ANIME.currentEpisode = null;
+            S_ANIME.animeStreams = [];
+            switchView('anime');
+        }
+
+        async function playAnimeEpisode(urlEncoded, btnEl, index) {
+            const url = decodeURIComponent(urlEncoded);
+            S_ANIME.currentEpisode = index;
+
+            // Update active button
+            if (btnEl) {
+                document.querySelectorAll('.anime-ep-btn').forEach(b => b.classList.remove('active'));
+                btnEl.classList.add('active');
+            }
+
+            const container = document.getElementById('anime-player-container');
+            if (!container) return;
+
+            container.innerHTML = '<div class="anime-player-wrap"><div class="anime-player-loader"><div class="spinner"></div><span class="anime-loading-text">Cargando reproductor...</span></div></div>';
+
+            try {
+                const r = await fetch(`${API}/anime/episode?url=${encodeURIComponent(url)}`);
+                const j = await r.json();
+                const data = j.data;
+                const servers = data?.servers || [];
+
+                if (servers.length === 0) {
+                    container.innerHTML = '<div class="anime-player-wrap" style="padding:40px;text-align:center;color:var(--text-dim)">No hay servidores disponibles para este episodio.</div>';
+                    return;
+                }
+
+                S_ANIME.animeStreams = servers;
+
+                // Build server buttons
+                const serverBtns = servers.map((s, i) => `
+                    <button class="anime-server-btn ${i === 0 ? 'active' : ''}" onclick="loadAnimeStream(${i}, this)">
+                        ${s.server || 'Servidor ' + (i + 1)}
+                    </button>
+                `).join('');
+
+                // Auto-load first server
+                const firstServer = servers[0];
+                let playerHtml = '';
+                if (firstServer.type === 'embed' || firstServer.url.includes('iframe')) {
+                    playerHtml = `<iframe src="${firstServer.url}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+                } else if (firstServer.type === 'hls' || firstServer.url.includes('.m3u8')) {
+                    playerHtml = `<video id="anime-video" controls playsinline style="width:100%;height:400px;background:#000"></video>`;
+                } else {
+                    playerHtml = `<iframe src="${firstServer.url}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+                }
+
+                container.innerHTML = `
+                    <div class="anime-player-wrap">
+                        ${playerHtml}
+                    </div>
+                    <div class="anime-server-list">${serverBtns}</div>
+                `;
+
+                // If HLS, init player
+                if (firstServer.type === 'hls' || firstServer.url.includes('.m3u8')) {
+                    setTimeout(() => {
+                        const videoEl = document.getElementById('anime-video');
+                        if (videoEl && Hls.isSupported()) {
+                            const hls = new Hls();
+                            hls.loadSource(firstServer.url);
+                            hls.attachMedia(videoEl);
+                            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                videoEl.play().catch(() => { });
+                            });
+                        } else if (videoEl && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                            videoEl.src = firstServer.url;
+                            videoEl.play().catch(() => { });
+                        }
+                    }, 100);
+                }
+            } catch (e) {
+                console.warn('Error loading episode:', e);
+                container.innerHTML = '<div class="anime-player-wrap" style="padding:40px;text-align:center;color:var(--text-dim)">Error al cargar el episodio.</div>';
+            }
+        }
+
+        function loadAnimeStream(index, btnEl) {
+            // Update active button
+            document.querySelectorAll('.anime-server-btn').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+
+            const server = S_ANIME.animeStreams[index];
+            if (!server) return;
+
+            const wrap = document.querySelector('.anime-player-wrap');
+            if (!wrap) return;
+
+            if (server.type === 'embed' || server.url.includes('iframe')) {
+                wrap.innerHTML = `<iframe src="${server.url}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+            } else if (server.type === 'hls' || server.url.includes('.m3u8')) {
+                wrap.innerHTML = `<video id="anime-video" controls playsinline style="width:100%;height:400px;background:#000"></video>`;
+                setTimeout(() => {
+                    const videoEl = document.getElementById('anime-video');
+                    if (videoEl && Hls.isSupported()) {
+                        const hls = new Hls();
+                        hls.loadSource(server.url);
+                        hls.attachMedia(videoEl);
+                        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                            videoEl.play().catch(() => { });
+                        });
+                    } else if (videoEl && videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                        videoEl.src = server.url;
+                        videoEl.play().catch(() => { });
+                    }
+                }, 100);
+            } else {
+                wrap.innerHTML = `<iframe src="${server.url}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>`;
+            }
+        }
+
+        // ===== SEARCH =====
+        function handleSearch() {
+            clearTimeout(S.searchTimeout);
+            const q = document.getElementById('search-input').value.trim();
+            if (!q) { switchView(S.prevView || 'home'); return; }
+
+            S.searchTimeout = setTimeout(async () => {
+                document.getElementById('search-title').textContent = `Resultados para "${q}"`;
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                document.getElementById('view-search').classList.add('active');
+
+                // Local search first
+                const localResults = [];
+                const ql = q.toLowerCase();
+                S.movies.forEach(m => { if (m.title?.toLowerCase().includes(ql)) localResults.push(m); });
+                S.series.forEach(s => { if (s.title?.toLowerCase().includes(ql)) localResults.push(s); });
+                S.channels.forEach(c => { if (c.name?.toLowerCase().includes(ql)) localResults.push(c); });
+
+                const grid = document.getElementById('search-grid');
+                if (localResults.length) {
+                    grid.innerHTML = localResults.map(i => i.category === 'TV' ? renderChannelShelfCard(i) : renderPosterCard(i)).join('');
+                } else {
+                    grid.innerHTML = '<div class="loading-box"><div class="spinner"></div><span class="loading-text">Buscando...</span></div>';
+                }
+
+                // API search
+                try {
+                    const r = await fetch(`${API}/search?query=${encodeURIComponent(q)}`);
+                    const j = await r.json();
+                    const apiResults = j.data || [];
+                    const merged = [...localResults];
+                    const seen = new Set(localResults.map(i => i.id));
+                    apiResults.forEach(i => { if (!seen.has(i.id)) { merged.push(i); seen.add(i.id); } });
+
+                    // Add matching channels
+                    S.channels.forEach(c => { if (!seen.has(c.id) && c.name?.toLowerCase().includes(ql)) { merged.push(c); } });
+
+                    grid.innerHTML = merged.length
+                        ? merged.map(i => i.category === 'TV' ? renderChannelShelfCard(i) : renderPosterCard(i)).join('')
+                        : '<div class="no-results">No se encontraron resultados.</div>';
+                } catch {
+                    if (!localResults.length) grid.innerHTML = '<div class="no-results">Error en la búsqueda. Intenta de nuevo.</div>';
+                }
+            }, 350);
+        }
+    </script>
+</body>
+
+</html>

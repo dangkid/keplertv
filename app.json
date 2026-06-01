@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "KeplerTV",
+    "slug": "keplertv",
+    "version": "1.0.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTabletMode": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ]
+  }
+}

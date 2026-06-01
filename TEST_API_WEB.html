@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 KeplerTV API Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #FF6B00;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #FF6B00;
+        }
+
+        .subtitle {
+            color: #aaa;
+            font-size: 1.1em;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin: 10px 0;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background-color: #4caf50;
+        }
+
+        .status.disconnected {
+            background-color: #f44336;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: #FF6B00;
+            box-shadow: 0 0 20px rgba(255, 107, 0, 0.3);
+        }
+
+        .card h3 {
+            color: #FF6B00;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card p {
+            color: #aaa;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        input, select {
+            flex: 1;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 0.9em;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #FF6B00;
+            box-shadow: 0 0 10px rgba(255, 107, 0, 0.2);
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #FF6B00;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        button:hover {
+            background: #e55a00;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 0, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .result {
+            background: #1a1a1a;
+            border: 1px solid #FF6B00;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        .result.loading {
+            color: #FF6B00;
+        }
+
+        .result.error {
+            border-color: #f44336;
+            color: #f44336;
+        }
+
+        .result.success {
+            border-color: #4caf50;
+            color: #4caf50;
+        }
+
+        .quick-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            padding: 8px 12px;
+            background: #333;
+            color: #FF6B00;
+            border: 1px solid #FF6B00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s ease;
+        }
+
+        .quick-btn:hover {
+            background: #FF6B00;
+            color: white;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #444;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            color: #FF6B00;
+            border-bottom-color: #FF6B00;
+        }
+
+        .tab:hover {
+            color: #FF6B00;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .endpoint-list {
+            list-style: none;
+            margin: 10px 0;
+        }
+
+        .endpoint-list li {
+            padding: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .endpoint-list li code {
+            color: #FF6B00;
+            background: #2a2a2a;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .emoji {
+            font-size: 1.2em;
+        }
+
+        .info-box {
+            background: rgba(255, 107, 0, 0.1);
+            border: 1px solid #FF6B00;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 KeplerTV API Tester</h1>
+            <p class="subtitle">Prueba todos los endpoints sin necesidad de Android</p>
+            <div id="status" class="status disconnected">🔴 Verificando conexión...</div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="tester">🧪 Tester</button>
+            <button class="tab" data-tab="docs">📖 Documentación</button>
+            <button class="tab" data-tab="setup">⚙️ Configuración</button>
+        </div>
+
+        <!-- TAB: TESTER -->
+        <div id="tester" class="tab-content active">
+            <div class="grid">
+                <!-- PELÍCULAS -->
+                <div class="card">
+                    <h3><span class="emoji">🎬</span> Películas Populares</h3>
+                    <p>Obtener películas de TMDB</p>
+                    <button onclick="testEndpoint('/api/movies/popular')">Probar</button>
+                    <div id="result-movies" class="result"></div>
+                </div>
+
+                <!-- SERIES -->
+                <div class="card">
+                    <h3><span class="emoji">📺</span> Series Populares</h3>
+                    <p>Obtener series de TMDB</p>
+                    <button onclick="testEndpoint('/api/series/popular')">Probar</button>
+                    <div id="result-series" class="result"></div>
+                </div>
+
+                <!-- TV EN VIVO -->
+                <div class="card">
+                    <h3><span class="emoji">📡</span> Canales En Vivo</h3>
+                    <p>60,000+ canales de IPTV Org</p>
+                    <button onclick="testEndpoint('/api/tv/live-channels')">Probar</button>
+                    <div id="result-channels" class="result"></div>
+                </div>
+
+                <!-- CANALES POR PAÍS -->
+                <div class="card">
+                    <h3><span class="emoji">🌍</span> Canales por País</h3>
+                    <p>Selecciona un país</p>
+                    <div class="input-group">
+                        <select id="country-select">
+                            <option value="ES">España 🇪🇸</option>
+                            <option value="US">USA 🇺🇸</option>
+                            <option value="MX">México 🇲🇽</option>
+                            <option value="AR">Argentina 🇦🇷</option>
+                            <option value="CO">Colombia 🇨🇴</option>
+                        </select>
+                        <button onclick="testCountry()">Probar</button>
+                    </div>
+                    <div id="result-country" class="result"></div>
+                </div>
+
+                <!-- BÚSQUEDA TMDB -->
+                <div class="card">
+                    <h3><span class="emoji">🔍</span> Buscar (TMDB)</h3>
+                    <p>Películas, series, actores</p>
+                    <div class="input-group">
+                        <input type="text" id="search-query" placeholder="Ej: breaking bad">
+                        <button onclick="testSearch()">Buscar</button>
+                    </div>
+                    <div id="result-search" class="result"></div>
+                </div>
+
+                <!-- BÚSQUEDA OMDB -->
+                <div class="card">
+                    <h3><span class="emoji">🎞️</span> Buscar OMDb</h3>
+                    <p>Películas clásicas</p>
+                    <div class="input-group">
+                        <input type="text" id="omdb-query" placeholder="Ej: matrix">
+                        <button onclick="testOMDbSearch()">Buscar</button>
+                    </div>
+                    <div id="result-omdb" class="result"></div>
+                </div>
+
+                <!-- TVMAZE BÚSQUEDA -->
+                <div class="card">
+                    <h3><span class="emoji">📺</span> Buscar TVMaze</h3>
+                    <p>Series con info completa</p>
+                    <div class="input-group">
+                        <input type="text" id="tvmaze-query" placeholder="Ej: game of thrones">
+                        <button onclick="testTVMazeSearch()">Buscar</button>
+                    </div>
+                    <div id="result-tvmaze" class="result"></div>
+                </div>
+
+                <!-- GÉNERO -->
+                <div class="card">
+                    <h3><span class="emoji">🎭</span> Películas por Género</h3>
+                    <p>Selecciona género</p>
+                    <div class="input-group">
+                        <select id="genre-select">
+                            <option value="28">Acción</option>
+                            <option value="12">Aventura</option>
+                            <option value="35">Comedia</option>
+                            <option value="27">Terror</option>
+                            <option value="18">Drama</option>
+                        </select>
+                        <button onclick="testGenre()">Probar</button>
+                    </div>
+                    <div id="result-genre" class="result"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: DOCUMENTACIÓN -->
+        <div id="docs" class="tab-content">
+            <div class="card">
+                <h3>📖 Endpoints Disponibles</h3>
+                
+                <h4 style="color: #FF6B00; margin-top: 20px;">🎬 Películas</h4>
+                <ul class="endpoint-list">
+                    <li><code>GET /api/movies/popular</code> - Películas populares</li>
+                    <li><code>GET /api/movies/genre/:id</code> - Por género (28=Acción)</li>
+                    <li><code>GET /api/movies/:id</code> - Detalles</li>
+                    <li><code>GET /api/movies/search-omdb/:query</code> - Buscar en OMDb</li>
+                </ul>
+
+                <h4 style="color: #FF6B00; margin-top: 20px;">📺 Series</h4>
+                <ul class="endpoint-list">
+                    <li><code>GET /api/series/popular</code> - Series populares</li>
+                    <li><code>GET /api/series/search-tvmaze/:query</code> - Buscar TVMaze</li>
+                    <li><code>GET /api/series/tvmaze/:id/episodes</code> - Episodios</li>
+                </ul>
+
+                <h4 style="color: #FF6B00; margin-top: 20px;">📡 TV En Vivo</h4>
+                <ul class="endpoint-list">
+                    <li><code>GET /api/tv/live-channels</code> - Todos canales (IPTV)</li>
+                    <li><code>GET /api/tv/channels/:country</code> - Por país</li>
+                    <li><code>GET /api/tv/epg/:channel</code> - Guía de TV</li>
+                </ul>
+
+                <h4 style="color: #FF6B00; margin-top: 20px;">🔍 Búsqueda</h4>
+                <ul class="endpoint-list">
+                    <li><code>GET /api/search?query=...</code> - Búsqueda multi</li>
+                    <li><code>GET /api/search/omdb?query=...</code> - Buscar OMDb</li>
+                </ul>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h3>📚 Fuentes de Datos</h3>
+                <ul style="margin: 10px 0;">
+                    <li><strong>TMDB:</strong> Películas y series populares</li>
+                    <li><strong>TVMaze:</strong> Series con episodios</li>
+                    <li><strong>OMDb:</strong> Películas clásicas</li>
+                    <li><strong>IPTV Org:</strong> 60,000+ canales de TV en vivo</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- TAB: CONFIGURACIÓN -->
+        <div id="setup" class="tab-content">
+            <div class="card">
+                <h3>⚙️ Configuración API</h3>
+                
+                <div class="info-box">
+                    <strong>⚠️ IMPORTANTE:</strong> El backend debe estar corriendo en http://localhost:3000
+                </div>
+
+                <h4 style="color: #FF6B00; margin-top: 20px;">🚀 Para iniciar el backend:</h4>
+                <code style="background: #1a1a1a; padding: 10px; border-radius: 4px; display: block; margin: 10px 0;">
+                    cd backend<br>
+                    npm start
+                </code>
+
+                <h4 style="color: #FF6B00; margin-top: 20px;">🔑 API Keys Requeridas:</h4>
+                <ul style="margin: 10px 0;">
+                    <li>
+                        <strong>TMDB API Key:</strong> 
+                        <a href="https://www.themoviedb.org/settings/api" target="_blank" style="color: #FF6B00;">
+                            Obtener gratis
+                        </a>
+                        - Agregar en backend/.env
+                    </li>
+                    <li>
+                        <strong>OMDb API Key:</strong> 
+                        <a href="http://www.omdbapi.com/apikey.aspx" target="_blank" style="color: #FF6B00;">
+                            Obtener gratis
+                        </a>
+                        - Agregar en backend/.env
+                    </li>
+                </ul>
+
+                <h4 style="color: #FF6B00; margin-top: 20px;">✅ APIs Gratuitas (Sin key):</h4>
+                <ul style="margin: 10px 0;">
+                    <li>✓ IPTV Org - 60,000+ canales en vivo</li>
+                    <li>✓ TVMaze - Series completas</li>
+                    <li>✓ OpenSubtitles (próximo)</li>
+                </ul>
+
+                <div class="info-box" style="margin-top: 20px;">
+                    <strong>💡 Tip:</strong> Prueba primero los endpoints que no necesitan API Key (IPTV, TVMaze)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+
+        // Verificar conexión al cargar
+        document.addEventListener('DOMContentLoaded', checkConnection);
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+
+        async function checkConnection() {
+            try {
+                const res = await fetch('http://localhost:3000/', { mode: 'cors' });
+                const statusEl = document.getElementById('status');
+                if (res.ok) {
+                    statusEl.innerHTML = '🟢 Backend Conectado';
+                    statusEl.className = 'status connected';
+                } else {
+                    statusEl.innerHTML = '🔴 Backend No Responde';
+                    statusEl.className = 'status disconnected';
+                }
+            } catch (e) {
+                document.getElementById('status').innerHTML = '🔴 Backend No Disponible';
+                document.getElementById('status').className = 'status disconnected';
+            }
+        }
+
+        async function testEndpoint(endpoint, resultId) {
+            const resultEl = document.getElementById(resultId || `result-${endpoint.split('/').pop()}`);
+            resultEl.innerHTML = '⏳ Cargando...';
+            resultEl.className = 'result loading';
+
+            try {
+                const res = await fetch(`http://localhost:3000${endpoint}`, { mode: 'cors' });
+                const data = await res.json();
+                
+                let display = '';
+                if (data.data && Array.isArray(data.data)) {
+                    display = `✅ Total: ${data.data.length} resultados\n\n`;
+                    display += JSON.stringify(data.data.slice(0, 3), null, 2);
+                } else {
+                    display = JSON.stringify(data, null, 2);
+                }
+
+                resultEl.innerHTML = display;
+                resultEl.className = 'result success';
+            } catch (e) {
+                resultEl.innerHTML = `❌ Error: ${e.message}`;
+                resultEl.className = 'result error';
+            }
+        }
+
+        function testCountry() {
+            const country = document.getElementById('country-select').value;
+            testEndpoint(`/tv/channels/${country}`, 'result-country');
+        }
+
+        function testSearch() {
+            const query = document.getElementById('search-query').value || 'matrix';
+            testEndpoint(`/search?query=${query}`, 'result-search');
+        }
+
+        function testOMDbSearch() {
+            const query = document.getElementById('omdb-query').value || 'matrix';
+            testEndpoint(`/search/omdb?query=${query}`, 'result-omdb');
+        }
+
+        function testTVMazeSearch() {
+            const query = document.getElementById('tvmaze-query').value || 'breaking%20bad';
+            testEndpoint(`/series/search-tvmaze/${query}`, 'result-tvmaze');
+        }
+
+        function testGenre() {
+            const genre = document.getElementById('genre-select').value;
+            testEndpoint(`/movies/genre/${genre}`, 'result-genre');
+        }
+    </script>
+</body>
+</html>
