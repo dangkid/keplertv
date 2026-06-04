@@ -21,4 +21,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Rebuild 2026-06-04
 CMD ["node", "backend/server.js"]
