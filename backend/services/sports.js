@@ -1,16 +1,18 @@
 // ===== SERVICIO DE DEPORTES EN VIVO =====
 // Fuentes:
-// 1. jjfutbol2.lat - Agenda de partidos con canales (POST a agenda.php con token)
-// 2. futbol-libre.su - Canales deportivos en vivo (fallback)
-// Cache TTL: 60 segundos para datos en tiempo real
-// Mirror: 300 segundos (5 min) para el endpoint espejo
+// 1. Football-Data.org (PRIMARY) - API oficial, partidos futuros + en vivo
+// 2. jjfutbol2.lat - Agenda de partidos con canales (FALLBACK)
+// 3. futbol-libre.su - Canales deportivos en vivo (FALLBACK)
+// Cache TTL: 30 segundos para datos en tiempo real
 
 const axios = require('axios');
 const { cache } = require('../utils/cache');
 
-const SPORTS_CACHE_TTL = 60;
+const SPORTS_CACHE_TTL = 30; // 30 seg para datos en vivo
 const MIRROR_CACHE_TTL = 300; // 5 minutos para el espejo
-const AGENDA_TOKEN = 'TU_TOKEN_SECRETO_AQUI_32_CHARS__';
+const FOOTBALL_DATA_KEY = process.env.FOOTBALL_DATA_KEY || '1c5b52ade62542b7be09fcf640d89bf1';
+const FOOTBALL_DATA_BASE = 'https://api.football-data.org/v4';
+const AGENDA_TOKEN = process.env.AGENDA_TOKEN || 'token_fallback';
 
 // Canales deportivos de futbol-libre.su con metadatos completos
 const SPORTS_CHANNELS = [
@@ -22,6 +24,30 @@ const SPORTS_CHANNELS = [
         logo: 'https://cdn.futbol-libre.su/img/espn1.webp',
         description: 'ESPN (Entertainment and Sports Programming Network) transmite fútbol, UFC, NFL, NBA y más.',
         url: 'https://futbol-libre.su/espn-1/',
+        country: 'Latinoamérica',
+        category: 'Deportes',
+        bgColor: '#c8102e'
+    },
+    {
+        id: 'espn-2',
+        name: 'ESPN 2',
+        fullName: 'ESPN 2',
+        slug: 'espn-2',
+        logo: 'https://cdn.futbol-libre.su/img/espn2.webp',
+        description: 'ESPN 2 transmite fútbol, tenis, baloncesto, béisbol y más deportes en Latinoamérica.',
+        url: 'https://futbol-libre.su/espn-2/',
+        country: 'Latinoamérica',
+        category: 'Deportes',
+        bgColor: '#c8102e'
+    },
+    {
+        id: 'espn-3',
+        name: 'ESPN 3',
+        fullName: 'ESPN 3',
+        slug: 'espn-3',
+        logo: 'https://cdn.futbol-libre.su/img/espn3.webp',
+        description: 'ESPN 3 transmite partidos en vivo de múltiples deportes y ligas internacionales.',
+        url: 'https://futbol-libre.su/espn-3/',
         country: 'Latinoamérica',
         category: 'Deportes',
         bgColor: '#c8102e'
@@ -75,6 +101,30 @@ const SPORTS_CHANNELS = [
         bgColor: '#003da5'
     },
     {
+        id: 'fox-sports-2',
+        name: 'Fox Sports 2',
+        fullName: 'Fox Sports 2',
+        slug: 'fox-sports-2',
+        logo: 'https://cdn.futbol-libre.su/img/fox_sports_2.webp',
+        description: 'Fox Sports 2 transmite fútbol mexicano, Liga MX, NFL, UFC y más.',
+        url: 'https://futbol-libre.su/fox-sports-2/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#003da5'
+    },
+    {
+        id: 'fox-sports-3',
+        name: 'Fox Sports 3',
+        fullName: 'Fox Sports 3',
+        slug: 'fox-sports-3',
+        logo: 'https://cdn.futbol-libre.su/img/fox_sports_3.webp',
+        description: 'Fox Sports 3 transmite deportes en vivo: fútbol, béisbol, baloncesto y más.',
+        url: 'https://futbol-libre.su/fox-sports-3/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#003da5'
+    },
+    {
         id: 'tudn',
         name: 'TUDN',
         fullName: 'TUDN',
@@ -109,6 +159,79 @@ const SPORTS_CHANNELS = [
         country: 'Argentina',
         category: 'Deportes',
         bgColor: '#5200a0'
+    },
+    // Canales adicionales de futbol-libre.su
+    {
+        id: 'azteca-7',
+        name: 'Azteca 7',
+        fullName: 'Azteca 7',
+        slug: 'azteca-7',
+        logo: 'https://cdn.futbol-libre.su/img/azteca_7.webp',
+        description: 'Azteca 7 transmite fútbol mexicano, Liga MX y más.',
+        url: 'https://futbol-libre.su/azteca-7/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#c41230'
+    },
+    {
+        id: 'canal-5',
+        name: 'Canal 5',
+        fullName: 'Canal 5',
+        slug: 'canal-5',
+        logo: 'https://cdn.futbol-libre.su/img/canal_5.webp',
+        description: 'Canal 5 transmite eventos deportivos seleccionados.',
+        url: 'https://futbol-libre.su/canal-5/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#003b6f'
+    },
+    {
+        id: 'imagen-tv',
+        name: 'Imagen TV',
+        fullName: 'Imagen TV',
+        slug: 'imagen-tv',
+        logo: 'https://cdn.futbol-libre.su/img/imagen_tv.webp',
+        description: 'Imagen TV transmite fútbol mexicano y eventos deportivos.',
+        url: 'https://futbol-libre.su/imagen-tv/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#004b87'
+    },
+    {
+        id: 'multimedios',
+        name: 'Multimedios',
+        fullName: 'Multimedios',
+        slug: 'multimedios',
+        logo: 'https://cdn.futbol-libre.su/img/multimedios.webp',
+        description: 'Multimedios transmite Liga MX y fútbol mexicano.',
+        url: 'https://futbol-libre.su/multimedios/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#ed1c24'
+    },
+    {
+        id: 'tv-azteca',
+        name: 'TV Azteca',
+        fullName: 'TV Azteca',
+        slug: 'tv-azteca',
+        logo: 'https://cdn.futbol-libre.su/img/tv_azteca.webp',
+        description: 'TV Azteca transmite fútbol mexicano y eventos deportivos.',
+        url: 'https://futbol-libre.su/tv-azteca/',
+        country: 'México',
+        category: 'Deportes',
+        bgColor: '#004b87'
+    },
+    {
+        id: 'gol-peru',
+        name: 'Gol Perú',
+        fullName: 'Gol Perú',
+        slug: 'gol-peru',
+        logo: 'https://cdn.futbol-libre.su/img/gol_peru.webp',
+        description: 'Gol Perú transmite fútbol peruano, Liga 1 y más.',
+        url: 'https://futbol-libre.su/gol-peru/',
+        country: 'Perú',
+        category: 'Deportes',
+        bgColor: '#e30613'
     }
 ];
 
@@ -168,8 +291,9 @@ async function getChannelStream(channelId) {
 }
 
 /**
- * Obtener partidos de fútbol desde jjfutbol2.lat
- * @returns {Promise<Array>} - Array de partidos con canales
+ * Obtener partidos de fútbol desde Football-Data.org
+ * Retorna próximos partidos, en vivo y finalizados
+ * @returns {Promise<Array>} - Array de partidos
  */
 async function getLiveFootballMatches() {
     const cacheKey = 'sports:live:football';
@@ -177,16 +301,30 @@ async function getLiveFootballMatches() {
     if (cached) return cached;
 
     try {
+        // Intentar Football-Data.org primero
+        const matches = await fetchFootballDataMatches();
+        if (matches && matches.length > 0) {
+            cache.set(cacheKey, matches, SPORTS_CACHE_TTL);
+            console.log(`[Sports] Loaded ${matches.length} matches from Football-Data.org`);
+            return matches;
+        }
+    } catch (error) {
+        console.warn('[Sports] Error fetching Football-Data.org:', error.message);
+    }
+
+    // Fallback a jjfutbol2.lat
+    try {
         const matches = await fetchJJFutbolAgenda();
         if (matches.length > 0) {
             cache.set(cacheKey, matches, SPORTS_CACHE_TTL);
+            console.log(`[Sports] Fallback to jjfutbol2.lat: ${matches.length} matches`);
             return matches;
         }
     } catch (error) {
         console.warn('[Sports] Error fetching jjfutbol2.lat:', error.message);
     }
 
-    // Fallback: devolver canales como eventos
+    // Fallback final: devolver canales como eventos
     const channels = await getSportsChannels();
     const fallbackMatches = channels.map((ch, i) => ({
         id: `ch_${ch.id}`,
@@ -218,6 +356,114 @@ async function getLiveFootballMatches() {
 
     cache.set(cacheKey, fallbackMatches, SPORTS_CACHE_TTL);
     return fallbackMatches;
+}
+
+/**
+ * Fetch matches from Football-Data.org
+ * Usa caché agresivo y rate limit control
+ */
+async function fetchFootballDataMatches() {
+    // Competiciones principales (reducidas para evitar rate limit)
+    const competitions = [
+        { id: 'PL', name: 'Premier League' },           // Inglaterra (MÁS CONFIABLE)
+        { id: 'BL1', name: 'Bundesliga' },              // Alemania
+        { id: 'CL', name: 'Champions League' }          // Europa (cuando hay)
+    ];
+
+    const cacheKey = 'sports:fd:matches:cache';
+    const cachedMatches = cache.get(cacheKey);
+    if (cachedMatches && cachedMatches.length > 0) {
+        return cachedMatches;
+    }
+
+    const allMatches = [];
+    const now = new Date();
+
+    for (const comp of competitions) {
+        try {
+            // Obtener solo próximos partidos (más ligero)
+            const dateFrom = new Date(now);
+            dateFrom.setDate(dateFrom.getDate() - 2); // Últimos 2 días (partidos finalizados recientes)
+            const dateTo = new Date(now);
+            dateTo.setDate(dateTo.getDate() + 30); // Próximos 30 días
+
+            const response = await axios.get(`${FOOTBALL_DATA_BASE}/competitions/${comp.id}/matches`, {
+                params: {
+                    dateFrom: dateFrom.toISOString().split('T')[0],
+                    dateTo: dateTo.toISOString().split('T')[0],
+                    status: 'SCHEDULED,LIVE,FINISHED'
+                },
+                headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY },
+                timeout: 8000
+            });
+
+            const matches = response.data.matches || [];
+            console.log(`[Football-Data] ${comp.id}: ${matches.length} matches`);
+
+            matches.forEach((match) => {
+                const utcDate = new Date(match.utcDate);
+                const diffMs = now - utcDate;
+                const diffMin = Math.floor(diffMs / 60000);
+
+                let status = 'scheduled';
+                let minute = utcDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+                if (match.status === 'LIVE') {
+                    status = 'live';
+                    minute = `${Math.max(0, diffMin)}'`;
+                } else if (match.status === 'FINISHED') {
+                    status = 'finished';
+                    minute = 'Finalizado';
+                }
+
+                // Filtro: incluir próximos + en vivo + recientes finalizados
+                const isRecentlyFinished = status === 'finished' && diffMin < 180; // últimas 3 horas
+                const isScheduled = status === 'scheduled' && diffMin < 30 * 24 * 60; // próximos 30 días
+
+                if (status === 'live' || isScheduled || isRecentlyFinished) {
+                    allMatches.push({
+                        id: `fd_${match.id}`,
+                        eventName: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
+                        league: comp.name,
+                        leagueBadge: match.competition?.emblem || '',
+                        sport: 'Soccer',
+                        homeTeam: match.homeTeam.name,
+                        awayTeam: match.awayTeam.name,
+                        homeScore: match.score.fullTime.home,
+                        awayScore: match.score.fullTime.away,
+                        homeBadge: match.homeTeam.crest || '',
+                        awayBadge: match.awayTeam.crest || '',
+                        date: utcDate.toISOString().split('T')[0],
+                        time: minute,
+                        status: status,
+                        minute: minute,
+                        venue: match.venue || '',
+                        thumb: match.competition?.emblem || '',
+                        video: '',
+                        country: comp.name,
+                        channels: [],
+                        season: match.season?.currentMatchday || '',
+                        round: match.stage || '',
+                        timestamp: utcDate.getTime()
+                    });
+                }
+            });
+
+            // Delay entre requests para evitar rate limit
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+        } catch (error) {
+            console.warn(`[Football-Data] Error fetching ${comp.id}:`, error.message);
+        }
+    }
+
+    // Ordenar por fecha (próximos primero)
+    const sorted = allMatches.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Caché por 5 minutos
+    cache.set(cacheKey, sorted, 300);
+
+    return sorted;
 }
 
 /**
@@ -256,14 +502,25 @@ async function fetchJJFutbolAgenda() {
         let awayTeam = '';
         let league = category;
 
-        // Formato: "Liga: \nEquipo A vs Equipo B"
-        const vsMatch = title.match(/(?:\w+:\s*)?\n?\s*(.+?)\s*(?:vs\.?|vs|VS|Vs|[-–—])\s*(.+)/);
+        // Formato típico: "LaLiga SmartBank: \nCórdoba vs Zaragoza"
+        // También: "Amistoso: Eslovaquia vs Malta" (sin newline)
+        // 1. Extraer liga del prefijo (todo antes de ": \n", ":\n" o ": ")
+        const leaguePrefixMatch = title.match(/^(.+?):\s*(?:\n| )/);
+        if (leaguePrefixMatch) {
+            league = leaguePrefixMatch[1].trim();
+        }
+
+        // 2. Remover el prefijo de liga para quedarnos solo con los equipos
+        let teamsPart = title;
+        if (leaguePrefixMatch) {
+            teamsPart = title.substring(leaguePrefixMatch[0].length).trim();
+        }
+
+        // 3. Buscar el separador "vs" en la parte de equipos
+        const vsMatch = teamsPart.match(/(.+?)\s*(?:vs\.?|VS|Vs|[-–—])\s*(.+)/);
         if (vsMatch) {
             homeTeam = vsMatch[1].trim();
             awayTeam = vsMatch[2].trim();
-            // Extraer liga del prefijo
-            const leagueMatch = title.match(/^([^:\n]+):/);
-            if (leagueMatch) league = leagueMatch[1].trim();
         }
 
         // Determinar si está en vivo (comparar hora actual)

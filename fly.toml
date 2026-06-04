@@ -1,0 +1,40 @@
+# ===== CONFIGURACIÓN FLY.IO =====
+# fly launch genera esto automáticamente, pero lo personalizamos
+
+app = "keplertv"
+primary_region = "mad"  # Madrid (Europa, cercano a ti)
+
+[build]
+dockerfile = "Dockerfile"
+
+[http_service]
+internal_port = 3000
+force_https = true
+auto_stop_machines = true
+auto_start_machines = true
+min_machines_running = 1
+
+[[vm]]
+cpu_kind = "shared"
+cpus = 1
+memory_mb = 256
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"
+CORS_ORIGIN = "*"
+
+# ===== VARIABLES DE ENTORNO SECRETAS =====
+# Configura estas en Fly.io dashboard o con:
+# flyctl secrets set TMDB_API_KEY=tu_clave
+# flyctl secrets set FOOTBALL_DATA_KEY=tu_clave
+# flyctl secrets set OFUTBOL_TOKEN=tu_token
+# flyctl secrets set OFUTBOL_ORIGIN=https://tunombre.fly.dev
+
+# Las claves que ya tienes en .env (solo pon los valores reales):
+# TMDB_API_KEY
+# FOOTBALL_DATA_KEY
+# OFUTBOL_TOKEN
+# OFUTBOL_ORIGIN
+# FOOTBALL_DATA_KEY (si lo usas)
+# AGENDA_TOKEN (si lo necesitas)

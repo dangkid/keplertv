@@ -17,6 +17,8 @@ const HTTP_HEADERS = {
 // Cada canal tiene su propia página en futbol-libre.su que internamente
 // carga el iframe de latamvidz1.com
 const SPORTS_CHANNELS = [
+    // SOLO CANALES QUE REALMENTE EXISTEN EN FUTBOL-LIBRE.SU
+    // (Verificado: los demás devuelven HTTP 404)
     { id: 'espn', name: 'ESPN 1', logo: 'https://cdn.futbol-libre.su/img/espn1.webp', country: 'Latinoamérica', page: '/espn-1/' },
     { id: 'dsports', name: 'DirectTV Sports', logo: 'https://cdn.futbol-libre.su/img/dsports.webp', country: 'Latinoamérica', page: '/directv-sports/' },
     { id: 'tycsports', name: 'TyC Sports', logo: 'https://cdn.futbol-libre.su/img/tyc_sports.webp', country: 'Argentina', page: '/tyc-sports/' },

@@ -2658,7 +2658,7 @@
                 loadData('/movies/trending', d => S.trending = d),
                 loadData('/series/popular', d => S.series = d),
                 loadData('/series/trending', d => S.trendingSeries = d),
-                loadData('/tv/live-channels', d => S.channels = d),
+                loadData('/tv/channels', d => S.channels = d),
                 loadSportsData(),
                 loadSportsChannels(),
             ]);
@@ -4012,44 +4012,87 @@
         // ===== ANIME =====
         let S_ANIME = {
             results: [],
+            allAnime: [],
             currentDetail: null,
             currentEpisode: null,
-            animeStreams: []
+            animeStreams: [],
+            selectedGenre: 'Todos',
+            availableGenres: []
         };
 
         function renderAnime() {
             const content = document.getElementById('anime-content');
             if (!content) return;
-            // Show welcome screen if no results
-            if (!S_ANIME.results || S_ANIME.results.length === 0) {
-                content.innerHTML = `
-                    <div class="anime-welcome">
-                        <div class="anime-welcome-icon">🎌</div>
-                        <h3 class="anime-welcome-title">Explora el mundo del Anime</h3>
-                        <p class="anime-welcome-text">Busca tus animes favoritos y disfruta de episodios en español.</p>
-                        <div class="anime-suggestions">
-                            <span class="anime-suggestion" onclick="searchAnimeQuery('Naruto')">Naruto</span>
-                            <span class="anime-suggestion" onclick="searchAnimeQuery('One Piece')">One Piece</span>
-                            <span class="anime-suggestion" onclick="searchAnimeQuery('Dragon Ball')">Dragon Ball</span>
-                            <span class="anime-suggestion" onclick="searchAnimeQuery('Attack on Titan')">Attack on Titan</span>
-                            <span class="anime-suggestion" onclick="searchAnimeQuery('Demon Slayer')">Demon Slayer</span>
-                            <span class="anime-suggestion" onclick="searchAnimeQuery('Jujutsu Kaisen')">Jujutsu Kaisen</span>
-                        </div>
-                    </div>
-                `;
+
+            // If no results, load popular anime
+            if (!S_ANIME.allAnime || S_ANIME.allAnime.length === 0) {
+                content.innerHTML = '<div class="anime-loading"><div class="spinner"></div><span class="anime-loading-text">Cargando animes populares...</span></div>';
+                loadPopularAnimeList();
                 return;
             }
-            // Show results grid
-            const grid = S_ANIME.results.map(item => `
+
+            // Filter by genre
+            let filtered = S_ANIME.allAnime;
+            if (S_ANIME.selectedGenre !== 'Todos') {
+                filtered = S_ANIME.allAnime.filter(a => a.genre === S_ANIME.selectedGenre);
+            }
+            S_ANIME.results = filtered;
+
+            // Genre pills
+            const genrePills = S_ANIME.availableGenres.map(g => `
+                <span class="g-pill ${S_ANIME.selectedGenre === g ? 'active' : ''}" onclick="setAnimeGenre('${g}')">
+                    ${g}
+                </span>
+            `).join('');
+
+            // Grid
+            const grid = filtered.map(item => `
                 <div class="anime-card" onclick="openAnimeDetail('${encodeURIComponent(item.url)}', '${item.title.replace(/'/g, "\\'")}')">
-                    <img class="anime-card-img" src="${item.image || 'https://via.placeholder.com/300x400/13131e/78788e?text=Anime'}" alt="${item.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x400/13131e/78788e?text=Anime'">
+                    <img class="anime-card-img" src="${item.image}" alt="${item.title}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 300 400%22%3E%3Crect fill=%22%2313131e%22 width=%22300%22 height=%22400%22/%3E%3Ctext x=%22150%22 y=%22200%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%2378788e%22 font-size=%2236%22 font-weight=%22bold%22 font-family=%22sans-serif%22%3EAnime%3C/text%3E%3C/svg%3E'">
                     <div class="anime-card-body">
                         <div class="anime-card-title">${item.title}</div>
-                        <div class="anime-card-type">Anime</div>
+                        <div class="anime-card-type">${item.genre}</div>
                     </div>
                 </div>
             `).join('');
-            content.innerHTML = `<div class="anime-grid">${grid}</div>`;
+
+            content.innerHTML = `<div class="genre-bar">${genrePills}</div><div class="anime-grid">${grid}</div>`;
+        }
+
+        function setAnimeGenre(genre) {
+            S_ANIME.selectedGenre = genre;
+            renderAnime();
+        }
+
+        async function loadPopularAnimeList() {
+            try {
+                const r = await fetch(`${API}/anime/popular`);
+                const j = await r.json();
+                S_ANIME.allAnime = j.data || [];
+                S_ANIME.availableGenres = j.genres || ['Todos'];
+                S_ANIME.selectedGenre = 'Todos';
+                renderAnime();
+            } catch (e) {
+                console.warn('Error loading popular anime:', e);
+                const content = document.getElementById('anime-content');
+                if (content) {
+                    content.innerHTML = `
+                        <div class="anime-welcome">
+                            <div class="anime-welcome-icon">🎌</div>
+                            <h3 class="anime-welcome-title">Explora el mundo del Anime</h3>
+                            <p class="anime-welcome-text">Busca tus animes favoritos y disfruta de episodios en español.</p>
+                            <div class="anime-suggestions">
+                                <span class="anime-suggestion" onclick="searchAnimeQuery('Naruto')">Naruto</span>
+                                <span class="anime-suggestion" onclick="searchAnimeQuery('One Piece')">One Piece</span>
+                                <span class="anime-suggestion" onclick="searchAnimeQuery('Dragon Ball')">Dragon Ball</span>
+                                <span class="anime-suggestion" onclick="searchAnimeQuery('Attack on Titan')">Attack on Titan</span>
+                                <span class="anime-suggestion" onclick="searchAnimeQuery('Demon Slayer')">Demon Slayer</span>
+                                <span class="anime-suggestion" onclick="searchAnimeQuery('Jujutsu Kaisen')">Jujutsu Kaisen</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
         }
 
         async function searchAnime() {

@@ -68,6 +68,10 @@ async function getMovieStreams(imdbId) {
                     fullUrl = 'https:' + link;
                 }
 
+                // SOLO incluir mirrors de nupload.me (los demás: supervideo, mixdrop, doodstream
+                // están bloqueados con "SANDBOX EMBED NOT ALLOWED")
+                if (!fullUrl.includes('nupload.me')) return;
+
                 // Determinar calidad por el nombre
                 let quality = 'HD';
                 if (name.includes('4K') || name.includes('fullhd') || $el.hasClass('fullhd')) {
@@ -75,7 +79,7 @@ async function getMovieStreams(imdbId) {
                 }
 
                 servers.push({
-                    name: name || `Server ${i + 1}`,
+                    name: name || `Nupload ${servers.length + 1}`,
                     url: fullUrl,
                     type: 'iframe',
                     quality: quality,
@@ -98,8 +102,11 @@ async function getMovieStreams(imdbId) {
                     fullUrl = 'https:' + link;
                 }
 
+                // SOLO incluir mirrors de nupload.me
+                if (!fullUrl.includes('nupload.me')) return;
+
                 servers.push({
-                    name: name || `Server oculto ${i + 1}`,
+                    name: name || `Nupload ${servers.length + 1}`,
                     url: fullUrl,
                     type: 'iframe',
                     quality: 'HD',
@@ -110,32 +117,13 @@ async function getMovieStreams(imdbId) {
             }
         });
 
-        // Si no se encontraron servidores, devolver el iframe directo como fallback
-        if (servers.length === 0) {
-            servers.push({
-                name: 'VerHDLink',
-                url: `${BASE_URL}/movie/${imdbId}`,
-                type: 'iframe',
-                quality: 'HD',
-                alive: true,
-                lang: 'es',
-                source: 'verhdlink'
-            });
-        }
-
+        // Si no se encontraron servidores nupload.me, devolver array vacío
+        // (no devolver iframe directo porque está bloqueado)
         return servers;
     } catch (error) {
         console.error(`Error en verhdlink (${imdbId}):`, error.message);
-        // Fallback: devolver el iframe directo
-        return [{
-            name: 'VerHDLink',
-            url: `${BASE_URL}/movie/${imdbId}`,
-            type: 'iframe',
-            quality: 'HD',
-            alive: true,
-            lang: 'es',
-            source: 'verhdlink'
-        }];
+        // No devolver fallback con iframe directo porque está bloqueado
+        return [];
     }
 }
 

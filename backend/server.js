@@ -1,4 +1,35 @@
 require('dotenv').config();
+
+// ===== CUSTOM DNS RESOLVER (Cloudflare 1.1.1.1) =====
+// El ISP en España bloquea sitios como futbol-libre.su mediante
+// DNS poisoning (resuelve a 127.0.0.1). Sobrescribimos dns.lookup
+// para usar Cloudflare DNS y resolver correctamente las IPs reales.
+const dns = require('dns');
+// Set custom DNS servers for the dns module
+dns.setServers(['1.1.1.1', '1.0.0.1']);
+const dnsPromises = dns.promises;
+const origLookup = dns.lookup;
+// Override dns.lookup to use custom DNS servers (affects http/https modules)
+dns.lookup = (hostname, options, callback) => {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  dnsPromises.resolve4(hostname).then(addrs => {
+    const addr = addrs[0];
+    if (typeof options === 'number') {
+      callback(null, addr, options);
+    } else if (options.all) {
+      callback(null, addrs.map(a => ({ address: a, family: 4 })));
+    } else {
+      callback(null, addr, 4);
+    }
+  }).catch(err => {
+    // Fallback to original lookup on error
+    origLookup(hostname, options, callback);
+  });
+};
+
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -17,6 +48,7 @@ const searchRouter = require('./routes/search');
 const streamRouter = require('./routes/stream');
 const sportsRouter = require('./routes/sports');
 const animeRouter = require('./routes/anime');
+const ofutbolRouter = require('./routes/ofutbol');
 
 app.use('/api/movies', moviesRouter);
 app.use('/api/series', seriesRouter);
@@ -25,6 +57,7 @@ app.use('/api/search', searchRouter);
 app.use('/api/stream', streamRouter);
 app.use('/api/sports', sportsRouter);
 app.use('/api/anime', animeRouter);
+app.use('/api/ofutbol', ofutbolRouter);
 
 // ===== RUTA: DISCOVER (legacy compatibility) =====
 const { discoverByGenre, discoverByProvider } = require('./services/tmdb');
@@ -175,7 +208,6 @@ app.get('/api/channel-player', async (req, res) => {
     const playerHtml = proxyResponse.data;
 
     // Paso 3: Extraer la URL M3U8 del HTML del player
-    // Buscar en el código JavaScript: playbackURL = "..." o source: "..."
     let m3u8Url = '';
 
     // Buscar playbackURL = "..." (formato Clappr)
@@ -299,9 +331,18 @@ app.get('/api/embed-proxy', async (req, res) => {
         return match.replace(/^\/(?!\/)/, originUrl + '/');
       });
 
-      // Eliminar scripts de anuncios que causan problemas
-      content = content.replace(/<script[^>]*src=["'][^"']*(?:doubleclick|googlead|googlesyndication|popads|adsterra|cpmstar|exoclick)[^"']*["'][^>]*><\/script>/gi, '');
-      content = content.replace(/<script[^>]*src=["'][^"']*(?:doubleclick|googlead|googlesyndication|popads|adsterra|cpmstar|exoclick)[^"']*["'][^>]*\/>/gi, '');
+      // === ELIMINAR TODO TIPO DE ANUNCIOS ===
+      // Eliminar scripts de anuncios por src
+      content = content.replace(/<script[^>]*src=["'][^"']*(?:doubleclick|googlead|googlesyndication|popads|adsterra|cpmstar|exoclick|acscdn|wpadmngr|admanager|vpb\.apptopia|ads\.js|banner)[^"']*["'][^>]*(?:><\/script>|\/?>)/gi, '');
+
+      // Eliminar inline scripts maliciosos
+      content = content.replace(/<script[^>]*>[\s\S]*?(?:window\.open|adsbygoogle|_gaq|analytics|adroll|ads\.js|popup|banner|aclibrunPop|interhs|onepopon|clickaab)[\s\S]*?<\/script>/gi, '');
+
+      // Eliminar divs/iframes publicitarios
+      content = content.replace(/<(?:div|span|iframe)[^>]*(?:id|class)=["'][^"']*(?:ads?|banner|advert|popup|modal|float|overlay|sticky|google|doubleclick|kahs|onepopon|adcla)[^"']*["'][^>]*>[\s\S]*?<\/(?:div|span|iframe)>/gi, '');
+
+      // Eliminar noscript (fallback de anuncios)
+      content = content.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
 
       // Inyectar meta viewport y estilos básicos para iframe
       content = content.replace('</head>', `
@@ -347,6 +388,135 @@ app.get('/api/embed-proxy', async (req, res) => {
 
 // CORS preflight for embed proxy
 app.options('/api/embed-proxy', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', '*');
+  res.sendStatus(204);
+});
+
+// ===== ENDPOINT: NUUPLOAD CLEAN PROXY (strips ads & anti-devtools) =====
+// Fetches nupload.me /watch/ pages from the backend, strips all ads,
+// anti-devtools scripts, overlay divs, and serves a clean page with
+// just JWPlayer + the obfuscated URL decoder + player setup.
+// This allows the video to play in an iframe because JWPlayer runs
+// on nupload.me's origin, which is whitelisted by ibra.lat CDN.
+app.get('/api/nupload-clean', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ success: false, error: 'url param required' });
+
+  try {
+    const hostname = new URL(url).hostname;
+    if (!hostname.includes('nupload.me')) {
+      return res.status(400).json({ success: false, error: 'Only nupload.me URLs allowed' });
+    }
+
+    const response = await axios.get(url, {
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://pelisflix200.skin/',
+        'Origin': 'https://pelisflix200.skin',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+      },
+      maxRedirects: 5,
+      responseType: 'arraybuffer'
+    });
+
+    let html = typeof response.data === 'string' ? response.data : Buffer.from(response.data).toString('utf8');
+
+    // === STRIP ALL AD SCRIPTS ===
+    // Remove aclib popup script
+    html = html.replace(/<script[^>]*src=["'][^"']*acscdn\.com[^"']*["'][^>]*><\/script>/gi, '');
+    html = html.replace(/<script[^>]*src=["'][^"']*aclib\.js[^"']*["'][^>]*><\/script>/gi, '');
+    html = html.replace(/aclib\.runPop[^;]*;/gi, '');
+
+    // Remove adManager.js
+    html = html.replace(/<script[^>]*src=["'][^"']*wpadmngr\.com[^"']*["'][^>]*><\/script>/gi, '');
+    html = html.replace(/<script[^>]*src=["'][^"']*adManager\.js[^"']*["'][^>]*><\/script>/gi, '');
+
+    // Remove any script block containing ad-related variables
+    html = html.replace(/<script[^>]*>[\s\S]*?(?:interhs\s*=|onepopon\s*=|clickaab\s*=|nextaddsg|removecl|aclibrunPop)[\s\S]*?<\/script>/gi, '');
+
+    // Remove overlay divs with high z-index
+    html = html.replace(/<div[^>]*style=["'][^"']*(?:z-index\s*:\s*(?:9\d{2}|[1-9]\d{2,})|position\s*:\s*absolute[^"']*z-index\s*:\s*\d+)[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '');
+
+    // Remove elements with ad-related classes
+    html = html.replace(/<div[^>]*class=["'][^"']*onepopon[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '');
+    html = html.replace(/<div[^>]*class=["'][^"']*adcla[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '');
+
+    // Remove #kahs overlay div
+    html = html.replace(/#kahs\s*\{[^}]*\}/gi, '');
+    html = html.replace(/<div[^>]*id=["']kahs["'][^>]*>[\s\S]*?<\/div>/gi, '');
+
+    // Remove anti-devtools: function check() { ... debugger ... } check()
+    html = html.replace(/function\s+check\s*\(\s*\)\s*\{[^}]*debugger[^}]*\}\s*check\s*\(\s*\)\s*;?/gi, '');
+
+    // Remove keyboard shortcut blocking (keydown listener)
+    html = html.replace(/document\s*\[\s*(['"])addEventListener\1\s*\]\s*\(\s*(['"])keydown\2\s*,/gi, '// removed keydown: document.addEventListener("keydown",');
+
+    // Remove contextmenu prevention
+    html = html.replace(/document\s*\[\s*(['"])addEventListener\1\s*\]\s*\(\s*(['"])contextmenu\2\s*,/gi, '// removed contextmenu: document.addEventListener("contextmenu",');
+
+    // Remove the setInterval that adds overlay divs
+    html = html.replace(/interhs\s*=\s*setInterval\s*\([\s\S]*?clearInterval\s*\(\s*interhs\s*\)\s*;?\s*\}?\s*;?/gi, '// removed overlay interval');
+
+    // Remove the setTimeout that calls nextaddsg and removecl
+    html = html.replace(/setTimeout\s*\(\s*\(\s*\)\s*=>\s*\{[\s\S]*?nextaddsg\s*\(\s*\)\s*;?\s*removecl\s*\(\s*\)\s*;?\s*\}?\s*,\s*["']?\d+["']?\s*\)\s*;?/gi, '// removed ad timeout');
+
+    // Remove any window.open() calls
+    html = html.replace(/window\.open\s*\([^)]*\)/gi, '');
+
+    // Remove all script tags with src attributes (except video players)
+    html = html.replace(/<script[^>]*src=["'][^"']*(?:ad|pop|doubleclick|analytics|track|banner|googlead|syndication)[^"']*["'][^>]*><\/script>/gi, '');
+
+    // Remove inline event handlers with suspicious code
+    html = html.replace(/on(?:click|load|mouse\w+)=["'][^"']*(?:window\.open|popup|ad|banner|track)[^"']*["']/gi, '');
+
+    // Inject minimal CSS to ensure clean full-screen video
+    html = html.replace('</head>', `
+    <style>
+      body { margin:0; padding:0; background:#000; overflow:hidden; height:100vh; width:100vw; }
+      #player { position:absolute; top:0; left:0; width:100% !important; height:100% !important; overflow:hidden; background:#000; }
+      video { width:100% !important; height:100% !important; object-fit:contain; }
+      iframe { width:100% !important; height:100% !important; border:none; }
+      #kahs, .onepopon, .adcla, [style*="z-index:99"], [style*="z-index: 99"],
+      [style*="z-index:100"], [style*="z-index: 100"],
+      [style*="z-index:999"], [style*="z-index: 999"] { display:none !important; }
+    </style>
+    </head>`);
+
+    // Set headers to allow iframe embedding
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('X-Frame-Options', '');
+    res.set('Content-Security-Policy', "frame-ancestors *");
+    res.send(html);
+
+  } catch (e) {
+    console.warn('[NuploadClean] Error:', url, e.message);
+    // Fallback: return a page that tries to load the original URL directly
+    res.send(`<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { margin:0; padding:0; background:#000; overflow:hidden; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; }
+  .fallback { text-align:center; color:#999; padding:20px; }
+  .fallback h3 { color:#fff; margin-bottom:8px; }
+  .fallback .error { color:#e74c3c; font-size:13px; margin-bottom:12px; }
+  .fallback a { display:inline-block; margin-top:8px; padding:10px 24px; background:#6c5ce7; color:#fff; text-decoration:none; border-radius:6px; font-weight:600; }
+</style></head><body>
+<div class="fallback">
+  <h3>Error al cargar el reproductor</h3>
+  <div class="error">${e.message}</div>
+  <a href="${url.replace(/"/g, '"')}" target="_blank">Abrir en nueva pestaña ↗</a>
+</div>
+</body></html>`);
+  }
+});
+
+// CORS preflight for nupload-clean
+app.options('/api/nupload-clean', (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.set('Access-Control-Allow-Headers', '*');
@@ -452,6 +622,57 @@ app.get('/api/resolve-video', async (req, res) => {
 
 // CORS preflight for resolve-video
 app.options('/api/resolve-video', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', '*');
+  res.sendStatus(204);
+});
+
+// ===== ENDPOINT: VERIFICAR DISPONIBILIDAD DE STREAM =====
+// Hace un HEAD request (o GET de 1 byte) para ver si el stream responde.
+// Usado por el frontend para mostrar indicadores de estado en canales.
+app.get('/api/check-stream', async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.json({ alive: false });
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return res.json({ alive: false });
+  }
+
+  res.set('Access-Control-Allow-Origin', '*');
+
+  try {
+    const response = await axios.head(url, {
+      timeout: 6000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': '*/*'
+      },
+      maxRedirects: 3,
+      validateStatus: s => s < 500
+    });
+    return res.json({ alive: response.status >= 200 && response.status < 400 });
+  } catch {
+    // HEAD failed — try GET with small range
+    try {
+      const response = await axios.get(url, {
+        timeout: 6000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Range': 'bytes=0-1023'
+        },
+        responseType: 'stream',
+        maxRedirects: 3,
+        validateStatus: s => s < 500
+      });
+      response.data.destroy();
+      return res.json({ alive: response.status >= 200 && response.status < 400 });
+    } catch {
+      return res.json({ alive: false });
+    }
+  }
+});
+
+app.options('/api/check-stream', (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.set('Access-Control-Allow-Headers', '*');

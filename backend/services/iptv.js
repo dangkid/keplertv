@@ -4,8 +4,31 @@ const { COUNTRY_NAMES, GROUP_ES } = require('../utils/genres');
 const { RELIABLE_CHANNELS } = require('../data/reliable-channels');
 const { cache } = require('../utils/cache');
 
-const IPTV_URL = 'https://iptv-org.github.io/iptv/languages/spa.m3u';
 const IPTV_TTL = 3600000; // 1 hora
+
+// Múltiples fuentes: idioma español + playlists específicas por país
+const IPTV_SOURCES = [
+    'https://iptv-org.github.io/iptv/languages/spa.m3u',
+    'https://iptv-org.github.io/iptv/countries/ar.m3u',
+    'https://iptv-org.github.io/iptv/countries/mx.m3u',
+    'https://iptv-org.github.io/iptv/countries/co.m3u',
+    'https://iptv-org.github.io/iptv/countries/es.m3u',
+    'https://iptv-org.github.io/iptv/countries/pe.m3u',
+    'https://iptv-org.github.io/iptv/countries/cl.m3u',
+    'https://iptv-org.github.io/iptv/countries/ve.m3u',
+    'https://iptv-org.github.io/iptv/countries/bo.m3u',
+    'https://iptv-org.github.io/iptv/countries/ec.m3u',
+    'https://iptv-org.github.io/iptv/countries/uy.m3u',
+    'https://iptv-org.github.io/iptv/countries/py.m3u',
+    'https://iptv-org.github.io/iptv/countries/do.m3u',
+    'https://iptv-org.github.io/iptv/countries/cr.m3u',
+    'https://iptv-org.github.io/iptv/countries/pa.m3u',
+    'https://iptv-org.github.io/iptv/countries/gt.m3u',
+    'https://iptv-org.github.io/iptv/countries/hn.m3u',
+    'https://iptv-org.github.io/iptv/countries/ni.m3u',
+    'https://iptv-org.github.io/iptv/countries/sv.m3u',
+    'https://iptv-org.github.io/iptv/countries/cu.m3u',
+];
 
 /**
  * Parsear archivo M3U de IPTV-org
@@ -59,7 +82,7 @@ function parseM3U(text) {
 }
 
 /**
- * Obtener canales de IPTV-org (con caché)
+ * Obtener canales de IPTV-org (con caché) — múltiples fuentes en paralelo
  */
 async function fetchIPTVChannels() {
     const cacheKey = 'iptv:channels';
@@ -67,13 +90,33 @@ async function fetchIPTVChannels() {
     if (cached) return cached;
 
     try {
-        const res = await axios.get(IPTV_URL, {
-            timeout: 20000,
-            responseType: 'text'
-        });
-        const channels = parseM3U(res.data);
+        // Fetch todas las fuentes en paralelo con timeout individual
+        const results = await Promise.allSettled(
+            IPTV_SOURCES.map(url =>
+                axios.get(url, { timeout: 20000, responseType: 'text' })
+                    .then(res => parseM3U(res.data))
+                    .catch(() => [])
+            )
+        );
+
+        // Merge con deduplicación por nombre normalizado
+        const seen = new Set();
+        const channels = [];
+        let idx = 0;
+
+        for (const result of results) {
+            if (result.status !== 'fulfilled') continue;
+            for (const ch of result.value) {
+                const key = ch.name.toLowerCase().replace(/\s+/g, '');
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    channels.push({ ...ch, id: `iptv_${++idx}` });
+                }
+            }
+        }
+
         cache.set(cacheKey, channels, IPTV_TTL);
-        console.log(`📡 IPTV-org: ${channels.length} canales en español cargados`);
+        console.log(`📡 IPTV-org: ${channels.length} canales de ${IPTV_SOURCES.length} fuentes`);
         return channels;
     } catch (e) {
         console.warn('⚠️ Error IPTV-org:', e.message);
