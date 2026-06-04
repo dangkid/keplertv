@@ -334,7 +334,7 @@ async function getStreamingLinks(episodeId) {
  * Obtener anime popular
  */
 async function getPopularAnime(page = 1) {
-    const cacheKey = `anime:popular:${page}`;
+    const cacheKey = `anime:popular:v2:${page}`;
     const cached = cache.get(cacheKey);
     if (cached) return cached;
 
