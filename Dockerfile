@@ -1,25 +1,24 @@
-# ===== DOCKERFILE PARA FLY.IO =====
+# ===== DOCKERFILE PARA RAILWAY =====
+# Solo despliega el backend (Express) - ignora la app Expo/React Native
 FROM node:20-alpine
 
-# Directorio de trabajo
 WORKDIR /app
 
-# Copiar package.json y package-lock.json
-COPY package*.json ./
+# Copiar SOLO el package.json del backend
+COPY backend/package*.json ./
 
-# Instalar todas las dependencias (dev + production)
-# --legacy-peer-deps para conflictos de React/React-Native
-RUN npm ci --legacy-peer-deps
+# Instalar dependencias del backend (express, axios, dotenv, etc.)
+RUN npm ci
 
-# Copiar todo el proyecto
-COPY . .
+# Copiar el backend completo
+COPY backend/ ./backend/
 
-# Puerto (Fly.io asigna dinámicamente, pero escuchamos en 3000)
+# Copiar el frontend (index.html)
+COPY index.html ./
+
 EXPOSE 3000
 
-# Variable de entorno
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Comando para iniciar
 CMD ["node", "backend/server.js"]
