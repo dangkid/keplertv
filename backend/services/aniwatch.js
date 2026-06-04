@@ -336,31 +336,32 @@ async function getStreamingLinks(episodeId) {
 async function getPopularAnime(page = 1) {
     const cacheKey = `anime:popular:${page}`;
     const cached = cache.get(cacheKey);
-    if (cached) return { success: true, data: cached };
+    if (cached) return cached;
 
     try {
         // Usar datos locales populares como principal
-        const results = FALLBACK_POPULAR_ANIME.map(anime => ({
+        const animeList = FALLBACK_POPULAR_ANIME.map(anime => ({
             ...anime,
             slug: anime.id,
             url: `https://gogoanime.run/${anime.id}`,
-            type: 'anime'
+            type: 'anime',
+            genre: anime.genres[0] || 'Otros'
         })).slice(0, 12);
 
         // Extraer géneros únicos
         const genresSet = new Set(['Todos']);
-        results.forEach(anime => {
+        animeList.forEach(anime => {
             if (anime.genres) {
                 anime.genres.forEach(g => genresSet.add(g));
             }
         });
 
-        const data = { results, genres: Array.from(genresSet) };
-        cache.set(cacheKey, data, SEARCH_CACHE_TTL);
-        return { success: true, data };
+        const response = { success: true, data: animeList, genres: Array.from(genresSet) };
+        cache.set(cacheKey, response, SEARCH_CACHE_TTL);
+        return response;
     } catch (e) {
         console.warn('[Popular] Error:', e.message);
-        return { success: false, error: e.message };
+        return { success: false, data: [], genres: ['Todos'] };
     }
 }
 
