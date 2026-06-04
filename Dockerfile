@@ -7,8 +7,9 @@ WORKDIR /app
 # Copiar package.json y package-lock.json
 COPY package*.json ./
 
-# Instalar dependencias (con --legacy-peer-deps para conflictos de React)
-RUN npm ci --only=production --legacy-peer-deps
+# Instalar todas las dependencias (dev + production)
+# --legacy-peer-deps para conflictos de React/React-Native
+RUN npm ci --legacy-peer-deps
 
 # Copiar todo el proyecto
 COPY . .
